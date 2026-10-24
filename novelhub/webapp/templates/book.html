@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}{{ book.title }} · 目录{% endblock %}
+{% block content %}
+<div class="book-head">
+  <div class="book-cover">
+    {% if book.cover_path %}
+      <img src="{{ url_for('cover', bid=book.id) }}" alt="">
+    {% elif book.cover %}
+      <img src="{{ book.cover }}" alt="" referrerpolicy="no-referrer">
+    {% else %}
+      <span class="cover-fallback">{{ book.title[:2] }}</span>
+    {% endif %}
+  </div>
+  <div class="book-info">
+    <h1>{{ book.title }}</h1>
+    <p class="meta">{{ book.author or '佚名' }}{% if book.category %} · {{ book.category }}{% endif %}{% if book.status %} · {{ book.status }}{% endif %}</p>
+    <p class="meta small">{{ n_done }}/{{ n_all }} 章已抓取{% if book.url %} · <a href="{{ book.url }}" target="_blank" rel="noreferrer">来源页</a>{% endif %}</p>
+    {% if book.description %}<p class="desc">{{ book.description }}</p>{% endif %}
+    <div class="card-actions">
+      {% if n_done %}
+        <a class="btn" href="{{ url_for('read', bid=book.id, idx=(progress.chapter_idx if progress else 0)) }}">继续阅读</a>
+      {% endif %}
+      {% if book.url and n_done < n_all %}
+        <form method="post" action="{{ url_for('crawl_resume', bid=book.id) }}">
+          <button class="btn" type="submit">补抓未完成章节（{{ n_all - n_done }}）</button>
+        </form>
+      {% endif %}
+      <a class="btn ghost" href="{{ url_for('export_book', bid=book.id, fmt='epub') }}">导出 EPUB</a>
+      <a class="btn ghost" href="{{ url_for('export_book', bid=book.id, fmt='txt') }}">TXT</a>
+      <a class="btn ghost" href="{{ url_for('export_book', bid=book.id, fmt='md') }}">Markdown</a>
+      <a class="btn ghost" href="{{ url_for('switch_source', bid=book.id) }}">换源阅读（找同名）</a>
+    </div>
+  </div>
+</div>
+
+<div class="toc">
+  {% for vol_idx, vol_title, chs in groups %}
+  <section class="toc-vol">
+    <h2>{{ vol_title }}</h2>
+    <ol class="toc-list">
+      {% for ch in chs %}
+      <li class="{% if ch.idx == (progress.chapter_idx if progress else -1) %}current{% endif %}{% if not ch.words %} empty{% endif %}">
+        <a href="{{ url_for('read', bid=book.id, idx=ch.idx) }}">
+          <span class="toc-title">{{ ch.title }}</span>
+          {% if not ch.words %}<span class="tag">未抓取</span>{% endif %}
+        </a>
+      </li>
+      {% endfor %}
+    </ol>
+  </section>
+  {% endfor %}
+</div>
+{% endblock %}

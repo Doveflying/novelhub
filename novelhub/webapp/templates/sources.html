@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}源管理{% endblock %}
+{% block content %}
+<h1 class="page-title">源管理</h1>
+<p class="muted small">
+  Venera 兼容的 JS 源，一共 {{ rows | length }} 个，已安装 {{ installed_count }} 个，启用 {{ enabled_count }} 个。
+  启用的源会参与漫画聚合搜索。
+  <a class="btn sm ghost" href="{{ url_for('sources_rank') }}">看源排行榜（哪个源真能用）</a>
+</p>
+
+<table class="src-table">
+  <thead>
+    <tr><th>源</th><th>key</th><th>版本</th><th>状态</th><th>操作</th></tr>
+  </thead>
+  <tbody>
+  {% for r in rows %}
+    <tr>
+      <td>{{ r.name }}</td>
+      <td class="mono small">{{ r.key }}</td>
+      <td class="small">{{ r.version }}</td>
+      <td>
+        {% if r.installed %}<span class="chip done">已安装</span>{% else %}<span class="chip">未安装</span>{% endif %}
+        {% if r.enabled %}<span class="chip online">启用</span>{% else %}<span class="chip">停用</span>{% endif %}
+      </td>
+      <td class="src-actions">
+        {% if not r.installed %}
+        <form method="post" action="{{ url_for('sources_install') }}">
+          <input type="hidden" name="key" value="{{ r.key }}">
+          <button class="btn sm">安装</button>
+        </form>
+        {% endif %}
+        <form method="post" action="{{ url_for('sources_toggle') }}">
+          <input type="hidden" name="key" value="{{ r.key }}">
+          <input type="hidden" name="enabled" value="{{ '0' if r.enabled else '1' }}">
+          <button class="btn sm ghost">{{ '停用' if r.enabled else '启用' }}</button>
+        </form>
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

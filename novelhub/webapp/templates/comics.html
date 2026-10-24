@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}漫画书架{% endblock %}
+{% block content %}
+<div class="shelf-head">
+  <h1>漫画</h1>
+  <div class="shelf-actions">
+    <a class="btn" href="{{ url_for('search', q='', kind='comic') }}">聚合搜索</a>
+    <a class="btn ghost" href="{{ url_for('sources_page') }}">源管理</a>
+  </div>
+</div>
+
+{% if not items %}
+  <div class="empty">
+    <p class="big">漫画书架还是空的</p>
+    <p>去<a href="{{ url_for('search', q='', kind='comic') }}">聚合搜索</a>找一个作品，点进去会自动收进来。</p>
+  </div>
+{% else %}
+  <div class="grid">
+    {% for it in items %}
+    {% set c = it.comic %}
+    <article class="card">
+      <a class="cover" href="{{ url_for('comic_detail', key=c.source, comic_id=c.source_id) }}">
+        {% if c.cover %}
+          <img src="/api/img?u={{ c.cover | urlencode }}" alt="{{ c.title }}" loading="lazy">
+        {% else %}
+          <span class="cover-fallback">{{ c.title[:2] }}</span>
+        {% endif %}
+      </a>
+      <div class="card-body">
+        <h3><a href="{{ url_for('comic_detail', key=c.source, comic_id=c.source_id) }}">{{ c.title }}</a></h3>
+        <p class="meta">{{ c.author or '佚名' }}</p>
+        <p class="meta small">
+          <span class="chip">{{ c.source }}</span>
+          {% if it.last_ep %}
+            读到 <b>{{ it.last_title or ('第 ' ~ it.last_ep ~ ' 话') }}</b>
+          {% else %}
+            未开始
+          {% endif %}
+        </p>
+        <div class="card-actions">
+          {% if it.last_ep %}
+            <a class="btn sm" href="{{ url_for('comic_read', key=c.source, comic_id=c.source_id, ep_id=it.last_ep) }}{% if it.last_title %}?t={{ it.last_title | urlencode }}{% endif %}">继续阅读</a>
+          {% else %}
+            <a class="btn sm" href="{{ url_for('comic_detail', key=c.source, comic_id=c.source_id) }}">开始阅读</a>
+          {% endif %}
+          <a class="btn sm ghost" href="{{ url_for('comic_detail', key=c.source, comic_id=c.source_id) }}">章节</a>
+          <form method="post" action="{{ url_for('comics_delete', cid=c.id) }}"
+                onsubmit="return confirm('从书架移除《{{ c.title }}》？')">
+            <button class="btn sm danger" type="submit">移除</button>
+          </form>
+        </div>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+{% endif %}
+{% endblock %}

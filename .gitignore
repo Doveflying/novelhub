@@ -1,0 +1,59 @@
+# ============ 用户数据（绝不外传） ============
+data/
+exports/
+*.db
+*.db-wal
+*.db-shm
+
+# ============ 逆向分析产物（体积大且非本项目代码） ============
+rea-work/
+rea-work2/
+Lanerc-RE/
+Venera-RE/
+_backup_*/
+
+# ============ 第三方参考代码（版权不属于本项目） ============
+refs/venera/sources/
+refs/venera/tags.json
+refs/venera/tags_tw.json
+refs/venera/init.js
+refs/venera/sample-copy_manga.js
+refs/venera/opencc.txt
+
+# ============ 依赖 ============
+node_modules/
+package-lock.json
+
+# ============ 临时探测脚本与抓取快照 ============
+_probe_*.py
+_js_*.js
+_dump_*.html
+_packer_run.js
+_deob.js
+_fix_j.py
+_show_rank.py
+*.log
+
+# ============ Python ============
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# ============ 编辑器 / 系统 ============
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# ============ 本地配置（含凭据，用 config.example.json） ============
+config.json
+_srv.err
+
+# ============ 逆向分析文档（不公开） ============
+docs/app-reverse-engineering.md
+docs/CHANGELOG-*.md
+refs/anime/rules.json.bak
+refs/venera/

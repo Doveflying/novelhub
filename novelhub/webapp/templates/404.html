@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}没有找到{% endblock %}
+{% block content %}
+<div class="empty">
+  <p class="big">404</p>
+  <p>这本书或页面不在书库里。</p>
+  <p><a class="btn" href="{{ url_for('index') }}">回书架</a></p>
+</div>
+{% endblock %}

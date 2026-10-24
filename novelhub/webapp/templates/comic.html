@@ -1,0 +1,31 @@
+﻿{% extends "base.html" %}
+{% block title %}漫画阅读{% endblock %}
+{% block bodyclass %}comic-reading{% endblock %}
+{% block mainclass %}comic-main{% endblock %}
+{% block content %}
+<div class="reader-toolbar">
+  <a class="icon-btn" href="{{ url_for('comic_detail', key=key, comic_id=comic_id) }}" title="章节">☰</a>
+  <div class="reader-title">
+    <span class="rt-book" id="comicTitle">{{ key }} · {{ comic_id }}</span>
+    <span class="rt-ch" id="epTitle">{{ ep_title or ('第 ' ~ ep_id ~ ' 话') }}</span>
+  </div>
+  <div class="comic-pager">
+    <a class="icon-btn" id="prevEp" href="#" hidden>上一话</a>
+    <a class="icon-btn" id="nextEp" href="#" hidden>下一话</a>
+  </div>
+</div>
+
+<div class="comic-viewer" id="viewer"
+     data-key="{{ key }}" data-comic="{{ comic_id }}" data-ep="{{ ep_id }}">
+  <div class="comic-loading" id="comicLoading">
+    <p class="sk-note">正在取这一话的图片…（约 3–10 秒）</p>
+    <div class="sk-block"></div>
+    <div class="sk-block"></div>
+  </div>
+  <div class="comic-pages" id="comicPages"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='comic.js') }}{{ '?v=' ~ asset_v }}"></script>
+{% endblock %}

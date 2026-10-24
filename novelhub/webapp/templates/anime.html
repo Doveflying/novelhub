@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}{{ info.title }} · 动漫{% endblock %}
+{% block content %}
+<div class="anime-head">
+  <div class="anime-cover">
+    {% if info.cover %}<img src="/api/img?u={{ info.cover | urlencode }}" alt="">
+    {% else %}<span class="cover-fallback">{{ info.title[:2] }}</span>{% endif %}
+  </div>
+  <div class="anime-meta">
+    <h1 class="page-title">{{ info.title }}</h1>
+    <p class="muted small">
+      {{ info.year }}{% if info.area %} · {{ info.area }}{% endif %}
+      {% if info.remark %} · {{ info.remark }}{% endif %}
+      · 源：{{ info.source_name }}
+    </p>
+    <div class="card-actions">
+      {% if info.roads %}
+        <a class="btn" href="{{ url_for('anime_play', source=info.source, sid=info.source_id, ep_i=(progress.ep_idx if progress else 0), road=road_i) }}">
+          从第{{ (progress.ep_idx + 1) if progress else 1 }}集开始看
+        </a>
+      {% endif %}
+      {% if not saved %}
+      <form method="post" action="{{ url_for('anime_save') }}">
+        <input type="hidden" name="source" value="{{ info.source }}">
+        <input type="hidden" name="sid" value="{{ info.source_id }}">
+        <button class="btn ghost" type="submit">收藏</button>
+      </form>
+      {% else %}
+      <span class="badge">已在收藏</span>
+      {% endif %}
+      <a class="btn ghost" href="{{ url_for('search', q=info.title, kind='anime') }}">换源（找同名）</a>
+    </div>
+    {% if info.intro %}<p class="desc">{{ info.intro }}</p>{% endif %}
+  </div>
+</div>
+
+{% if info.roads %}
+<div class="road-tabs">
+  {% for road in info.roads %}
+  <a class="tab {{ 'on' if loop.index0 == road_i }}"
+     href="{{ url_for('anime_detail', source=info.source, sid=info.source_id, road=loop.index0) }}">
+    {{ road.road }} · {{ road.eps | length }} 集
+  </a>
+  {% endfor %}
+</div>
+
+{% set road = info.roads[road_i] %}
+<ol class="ep-grid">
+  {% for ep in road.eps %}
+  <li>
+    <a class="ep {{ 'on' if progress and progress.ep_idx == loop.index0 }}"
+       href="{{ url_for('anime_play', source=info.source, sid=info.source_id, ep_i=loop.index0, road=road_i) }}">
+      <span class="ep-n">{{ ep.name }}</span>
+      <span class="ep-u">{{ ep.url.split('/')[2] if '//' in ep.url else '' }}</span>
+    </a>
+  </li>
+  {% endfor %}
+</ol>
+{% else %}
+<p class="muted">这个源没给可播线路，换一个源试试。</p>
+{% endif %}
+{% endblock %}

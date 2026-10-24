@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}抓取新书{% endblock %}
+{% block content %}
+<h1 class="page-title">抓取新书</h1>
+
+<form class="form" method="post" action="{{ url_for('crawl_start') }}">
+  <label class="field">
+    <span>书籍地址</span>
+    <input type="url" name="url" value="{{ url }}" required
+           placeholder="https://www.bilinovel.com/novel/3805/326116_2.html">
+    <em>目录页、书籍页、任意章节页都可以，会自动归一化。</em>
+  </label>
+
+  <div class="row">
+    <label class="field">
+      <span>只抓前 N 章</span>
+      <input type="number" name="limit" min="1" placeholder="留空 = 全部">
+    </label>
+    <label class="field">
+      <span>只抓指定卷</span>
+      <input type="text" name="volumes" placeholder="例如 1,3-5（1 起算）">
+    </label>
+    <label class="field check">
+      <span>重抓</span>
+      <input type="checkbox" name="force" value="1">
+      <em>覆盖已有正文</em>
+    </label>
+    <label class="field check">
+      <span>只建目录</span>
+      <input type="checkbox" name="catalog_only" value="1">
+      <em>正文在线阅读，不落库</em>
+    </label>
+  </div>
+
+  <button class="btn" type="submit">开始抓取</button>
+  <a class="btn ghost" href="{{ url_for('index') }}">取消</a>
+</form>
+
+<section class="panel">
+  <h2>已支持的站点</h2>
+  <ul class="plain">
+    <li><b>linovelib 系</b>：bilinovel.com、linovelib.com、tw.linovelib.com</li>
+    <li><b>wenku8</b>：wenku8.net / .com / .la（GBK 站点）</li>
+    <li><b>narou</b>：ncode.syosetu.com（生肉原文）</li>
+    <li><b>generic</b>：在 <code>config.json → sources.generic</code> 里写选择器即可接入新站</li>
+  </ul>
+  <p class="muted small">请求间隔在 <code>config.json</code> 的 <code>delay</code> / <code>jitter</code> 调整；这些站点有 Cloudflare 与风控，默认 1.2s + 抖动已经比较稳。</p>
+</section>
+{% endblock %}

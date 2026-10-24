@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}{{ info.title }} · {{ ep.name }}{% endblock %}
+{% block bodyclass %}watching{% endblock %}
+{% block content %}
+<div class="player-wrap" id="playerWrap">
+  <video id="player" controls playsinline preload="metadata"
+         data-src="{{ ep.url }}"
+         data-source="{{ info.source }}" data-sid="{{ info.source_id }}"
+         data-epi="{{ ep_i }}" data-total="{{ eps | length }}"
+         data-eptitle="{{ ep.name }}" data-road="{{ info.roads[road_i].road }}"
+         data-anime="{{ info.title }}"
+         data-pos="{{ progress.position if progress and progress.ep_idx == ep_i else 0 }}"></video>
+  <canvas id="danmuLayer" class="danmu-layer"></canvas>
+  <p class="player-status muted small" id="playerStatus">正在准备播放…</p>
+</div>
+
+<div class="danmu-bar">
+  <label class="dm-toggle">
+    <input type="checkbox" id="dmEnabled" checked> 弹幕
+  </label>
+  <span class="dm-status muted small" id="dmStatus">未加载</span>
+  <button class="btn ghost small" type="button" id="dmReload">重新匹配</button>
+  <button class="btn ghost small" type="button" id="dmSettings">弹幕设置</button>
+</div>
+
+<div class="dm-panel" id="dmPanel" hidden>
+  <div class="dm-row">
+    <label>不透明度 <input type="range" id="dmOpacity" min="0.1" max="1" step="0.05"></label>
+    <span class="dm-val" id="dmOpacityVal"></span>
+  </div>
+  <div class="dm-row">
+    <label>字号 <input type="range" id="dmFontSize" min="14" max="40" step="1"></label>
+    <span class="dm-val" id="dmFontSizeVal"></span>
+  </div>
+  <div class="dm-row">
+    <label>速度 <input type="range" id="dmSpeed" min="0.4" max="2.5" step="0.1"></label>
+    <span class="dm-val" id="dmSpeedVal"></span>
+  </div>
+  <div class="dm-row">
+    <label>显示区域 <input type="range" id="dmArea" min="0.3" max="1" step="0.05"></label>
+    <span class="dm-val" id="dmAreaVal"></span>
+  </div>
+  <div class="dm-row dm-checks">
+    <label><input type="checkbox" id="dmScroll"> 滚动</label>
+    <label><input type="checkbox" id="dmTop"> 顶部</label>
+    <label><input type="checkbox" id="dmBottom"> 底部</label>
+    <label><input type="checkbox" id="dmBold"> 粗体</label>
+    <label><input type="checkbox" id="dmOutline"> 描边</label>
+    <label><input type="checkbox" id="dmMerge"> 合并重复</label>
+  </div>
+  <div class="dm-row">
+    <label class="dm-block">屏蔽词 <input type="text" id="dmBlockWords" placeholder="逗号分隔，如：哈哈, 233"></label>
+  </div>
+</div>
+
+<div class="player-head">
+  <h1 class="page-title">{{ info.title }} <small class="muted">{{ ep.name }}</small></h1>
+  <div class="card-actions">
+    {% if ep_i > 0 %}
+      <a class="btn ghost" href="{{ url_for('anime_play', source=info.source, sid=info.source_id, ep_i=ep_i-1, road=road_i) }}">← 上一集</a>
+    {% endif %}
+    {% if ep_i + 1 < eps | length %}
+      <a class="btn" href="{{ url_for('anime_play', source=info.source, sid=info.source_id, ep_i=ep_i+1, road=road_i) }}">下一集 →</a>
+    {% endif %}
+    <a class="btn ghost" href="{{ url_for('anime_detail', source=info.source, sid=info.source_id, road=road_i) }}">选集</a>
+  </div>
+</div>
+
+<ol class="ep-grid compact">
+  {% for e in eps %}
+  <li>
+    <a class="ep {{ 'on' if loop.index0 == ep_i }}"
+       href="{{ url_for('anime_play', source=info.source, sid=info.source_id, ep_i=loop.index0, road=road_i) }}">{{ e.name }}</a>
+  </li>
+  {% endfor %}
+</ol>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='vendor/hls.min.js') }}{{ '?v=' ~ asset_v }}"></script>
+<script src="{{ url_for('static', filename='player.js') }}{{ '?v=' ~ asset_v }}"></script>
+<script src="{{ url_for('static', filename='danmaku.js') }}{{ '?v=' ~ asset_v }}"></script>
+<script src="{{ url_for('static', filename='danmu-ui.js') }}{{ '?v=' ~ asset_v }}"></script>
+{% endblock %}

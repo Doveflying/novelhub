@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}动漫{% endblock %}
+{% block content %}
+<h1 class="page-title">动漫书架 <small class="muted">{{ items | length }} 部</small></h1>
+
+<form class="searchbar wide" action="{{ url_for('search') }}" method="get">
+  <input type="hidden" name="kind" value="anime">
+  <input type="search" name="q" placeholder="搜番剧名（如：进击的巨人）">
+</form>
+
+{% if items %}
+<div class="hit-grid">
+  {% for it in items %}
+  {% set a = it.anime %}
+  {% set p = it.progress %}
+  <div class="hit">
+    <span class="hit-cover">
+      {% if a.cover %}<img src="/api/img?u={{ a.cover | urlencode }}" loading="lazy" alt="">
+      {% else %}<span class="cover-fallback">{{ a.title[:2] }}</span>{% endif %}
+    </span>
+    <span class="hit-body">
+      <span class="hit-title">{{ a.title }}</span>
+      <span class="hit-sub">
+        {{ a.year }}
+        {%- if a.area %} · {{ a.area }}{% endif %}
+        {%- if a.total %} · 共 {{ a.total }} 集{% endif %}
+        {%- if a.isend %} · <span class="tag-done">已完结</span>
+        {%- elif a.remarks %} · <span class="tag-air">{{ a.remarks }}</span>{% endif %}
+        {%- if a.score %} · <span class="tag-score">★ {{ '%.1f' | format(a.score) }}</span>{% endif %}
+        · {{ a.source }}
+      </span>
+      {% if a.tags %}<span class="hit-tags">{{ a.tags }}</span>{% endif %}
+      {% if p %}
+        <span class="hit-tags">读到 第{{ p.ep_idx + 1 }}集 {{ p.ep_title }}</span>
+      {% endif %}
+      <span class="hit-src">
+        <a class="hit-act ok" href="{{ url_for('anime_detail', source=a.source, sid=a.source_id) }}">详情</a>
+        {% if p %}
+          · <a class="hit-act" href="{{ url_for('anime_play', source=a.source, sid=a.source_id, ep_i=p.ep_idx, road=p.idx if false else 0) }}">继续观看</a>
+        {% endif %}
+      </span>
+      <form method="post" action="{{ url_for('anime_delete', aid=a.id) }}" onsubmit="return confirm('移出收藏？')">
+        <button class="link-btn" type="submit">移除</button>
+      </form>
+    </span>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<p class="muted">还没有收藏番剧。用上面搜一个，进详情页点「收藏」。</p>
+{% endif %}
+
+<div class="card-actions" style="margin-top:22px">
+  <a class="btn ghost" href="{{ url_for('search') }}?q=%E8%BF%9B%E5%87%BB%E7%9A%84%E5%B7%A8%E4%BA%BA&kind=anime">用「进击的巨人」试一下</a>
+</div>
+<p class="muted small">可用番剧源：{% for s in sources %}{{ s.name }}（{{ s.key }}）{% if not loop.last %} · {% endif %}{% endfor %}</p>
+{% endblock %}

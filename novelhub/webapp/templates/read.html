@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}{{ chapter.title }} · {{ book.title }}{% endblock %}
+{% block bodyclass %}reading{% endblock %}
+{% block mainclass %}reader-main{% endblock %}
+{% block content %}
+<div class="reader-toolbar">
+  <button class="icon-btn" id="tocBtn" title="目录">☰</button>
+  <div class="reader-title">
+    <span class="rt-book">{{ book.title }}</span>
+    <span class="rt-ch">{{ chapter.title }}</span>
+  </div>
+  <div class="reader-tools">
+    <button class="icon-btn" id="settingsBtn" title="显示设置">Aa</button>
+  </div>
+</div>
+
+<div class="reader-progress"><i id="scrollBar"></i></div>
+
+<article class="reader wrap-narrow" id="reader"
+         data-book="{{ book.id }}" data-idx="{{ chapter.idx }}"
+         data-next="{{ next_ch.idx if next_ch else '' }}"
+         data-next-title="{{ (next_ch.title if next_ch else '') | e }}"
+         {% if live_defer %}data-live="1"{% endif %}>
+  <h1 class="chapter-title">{{ chapter.title }}</h1>
+  <div class="chapter-meta">
+    <span id="wordCount">{{ (chapter.words or 0) }}</span> 字 · {{ pos + 1 }}/{{ chapters | length }}
+    {% if online %}
+      · <span class="badge live">在线读取 · 未落库</span>
+    {% elif stored %}
+      · <span class="badge">已存本地</span>
+    {% endif %}
+    {% if book.url %}
+      {% if online %}
+        <a class="meta-link" href="{{ url_for('read', bid=book.id, idx=chapter.idx) }}">读本地副本</a>
+      {% elif stored %}
+        <a class="meta-link" href="{{ url_for('read', bid=book.id, idx=chapter.idx, live=1) }}">在线读（不落库）</a>
+      {% endif %}
+    {% endif %}
+  </div>
+  <div class="chapter-body" id="chapterBody">
+    {% if live_defer %}
+      <div class="skeleton" id="liveSkeleton">
+        <p class="sk-line w90"></p><p class="sk-line w80"></p><p class="sk-line w95"></p>
+        <p class="sk-note">正在从源站取这一章…（首次约 10–30 秒，之后走缓存）</p>
+        <p class="sk-line w70"></p><p class="sk-line w88"></p><p class="sk-line w60"></p>
+      </div>
+    {% else %}
+      {{ html_body | safe }}
+    {% endif %}
+  </div>
+  <nav class="chapter-nav">
+    {% if prev_ch %}
+      <a class="btn ghost" href="{{ url_for('read', bid=book.id, idx=prev_ch.idx) }}" rel="prev">← 上一章</a>
+    {% else %}<span></span>{% endif %}
+    <a class="btn ghost" href="{{ url_for('book', bid=book.id) }}">目录</a>
+    {% if next_ch %}
+      <a class="btn ghost{% if next_warm %} warm{% endif %}"
+         href="{{ url_for('read', bid=book.id, idx=next_ch.idx) }}" rel="next"
+         {% if next_warm %}title="下一章已缓存，点开即读"{% endif %}>下一章 →</a>
+    {% else %}<span></span>{% endif %}
+  </nav>
+
+</article>
+
+<aside class="drawer" id="tocDrawer">
+  <div class="drawer-head">
+    <strong>{{ book.title }}</strong>
+    <button class="icon-btn" id="tocClose">×</button>
+  </div>
+  <div class="drawer-body">
+    {% set ns = namespace(v=-1) %}
+    {% for ch in chapters %}
+      {% if ch.vol_idx != ns.v %}
+        {% set ns.v = ch.vol_idx %}
+        <div class="drawer-vol">{{ volumes.get(ch.vol_idx) or ('第' ~ (ch.vol_idx + 1) ~ '卷' if ch.vol_idx else '正文') }}</div>
+      {% endif %}
+      <a class="drawer-ch {% if ch.idx == chapter.idx %}on{% endif %}" href="{{ url_for('read', bid=book.id, idx=ch.idx) }}">{{ ch.title }}</a>
+    {% endfor %}
+  </div>
+</aside>
+
+<div class="settings-pop" id="settingsPop">
+  <label>字号 <input type="range" id="fontSize" min="15" max="30" step="1"></label>
+  <label>行距 <input type="range" id="lineHeight" min="150" max="260" step="5"></label>
+  <label>版心 <input type="range" id="measure" min="32" max="72" step="2"></label>
+  <div class="theme-row">
+    <button data-theme="paper" class="swatch">纸</button>
+    <button data-theme="sepia" class="swatch">黄</button>
+    <button data-theme="green" class="swatch">绿</button>
+    <button data-theme="night" class="swatch">夜</button>
+  </div>
+  <div class="kbd-hint">← → 翻章 · Esc 关闭</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='read.js') }}{{ '?v=' ~ asset_v }}"></script>
+{% endblock %}

@@ -1,0 +1,229 @@
+"""Venera 兼容的 JS 源：安装 / 调用 / 落成本地漫画。"""
+from __future__ import annotations
+
+import json
+import subprocess
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Optional
+from urllib.parse import urljoin
+
+from ..config import Config
+from ..net import Fetcher
+
+ROOT = Path(__file__).resolve().parent.parent.parent
+SOURCES_DIR = ROOT / "refs" / "venera" / "sources"
+RUNNER = Path(__file__).resolve().parent.parent / "jsruntime" / "runner.mjs"
+INDEX_URL = "https://cdn.jsdelivr.net/gh/venera-app/venera-configs@main/index.json"
+SOURCE_URL = "https://cdn.jsdelivr.net/gh/venera-app/venera-configs@main/{file}"
+
+
+@dataclass
+class SourceEntry:
+    key: str
+    name: str
+    file: str
+    version: str = ""
+    description: str = ""
+
+
+class VeneraRegistry:
+    """读取 venera-configs 的源清单，按 key 安装到 refs/venera/sources。"""
+
+    def __init__(self, cfg: Config):
+        self.cfg = cfg
+        self.index_file = ROOT / "refs" / "venera" / "configs-index.json"
+        SOURCES_DIR.mkdir(parents=True, exist_ok=True)
+
+    def index(self) -> list[SourceEntry]:
+        entries: list[SourceEntry] = []
+        seen: set[str] = set()
+        if self.index_file.exists():
+            try:
+                raw = json.loads(self.index_file.read_text(encoding="utf-8"))
+            except Exception:
+                raw = []
+            for item in raw:
+                key = item.get("key") or Path(item.get("fileName", "?")).stem
+                entries.append(
+                    SourceEntry(
+                        key=key,
+                        name=item.get("name", ""),
+                        file=item.get("fileName", ""),
+                        version=item.get("version", ""),
+                        description=item.get("description", ""),
+                    )
+                )
+                seen.add(key)
+        # 本地额外安装的源（比如用户丢进来的仓库压缩包）
+        for p in sorted(SOURCES_DIR.glob("*.js")):
+            if p.stem in seen:
+                continue
+            entries.append(self._entry_from_file(p))
+        return entries
+
+    @staticmethod
+    def _entry_from_file(p: Path) -> SourceEntry:
+        import re
+
+        text = p.read_text(encoding="utf-8", errors="replace")[:4000]
+        name = re.search(r'\bname\s*=\s*["\'`]([^"\'`]+)', text)
+        key = re.search(r'\bkey\s*=\s*["\'`]([^"\'`]+)', text)
+        ver = re.search(r'\bversion\s*=\s*["\'`]([^"\'`]+)', text)
+        return SourceEntry(
+            key=(key.group(1) if key else p.stem),
+            name=(name.group(1) if name else p.stem),
+            file=p.name,
+            version=(ver.group(1) if ver else ""),
+        )
+
+    def refresh_index(self) -> int:
+        with Fetcher(self.cfg) as f:
+            data = json.loads(f.get(INDEX_URL, use_cache=False))
+        self.index_file.parent.mkdir(parents=True, exist_ok=True)
+        self.index_file.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        return len(data)
+
+    def install(self, key: str) -> Path:
+        entry = next((e for e in self.index() if e.key == key), None)
+        if entry is None:
+            # 允许直接用文件名（ManHuaGui.js -> ManHuaGui）
+            local = SOURCES_DIR / f"{key}.js"
+            if local.exists():
+                return local
+            raise RuntimeError(f"清单里没有源：{key}")
+        target = SOURCES_DIR / entry.file
+        if not target.exists() or target.stat().st_size < 500:
+            if entry.file and (ROOT / "refs" / "venera" / "sources" / entry.file).exists():
+                return ROOT / "refs" / "venera" / "sources" / entry.file
+            with Fetcher(self.cfg) as f:
+                js = f.get(SOURCE_URL.format(file=entry.file), use_cache=False)
+            target.write_text(js, encoding="utf-8")
+        return target
+
+    def installed(self) -> list[tuple[SourceEntry, Path]]:
+        out = []
+        for e in self.index():
+            p = SOURCES_DIR / e.file
+            if p.exists() and p.stat().st_size > 500:
+                out.append((e, p))
+        return out
+
+
+class JsSource:
+    """一个已安装的 Venera 源，可执行 search / info / ep。"""
+
+    def __init__(self, cfg: Config, path: str | Path):
+        self.cfg = cfg
+        self.path = Path(path)
+        self.proxy = cfg.proxy
+        if not self.path.exists():
+            raise RuntimeError(f"源文件不存在：{self.path}")
+        self.store = cfg.data_path / "jsruntime" / f"{self.path.stem}.json"
+
+    # ---------------- 调用 ----------------
+    def call(self, action: str, params: Optional[dict] = None, timeout: int = 120) -> Any:
+        from ..config import detect_proxies
+
+        candidates = [self.proxy] if self.proxy else []
+        for p in detect_proxies():
+            if p not in candidates:
+                candidates.append(p)
+        last_err: Exception | None = None
+        for i, proxy in enumerate(candidates[:3] or [None]):
+            payload = {
+                "file": str(self.path),
+                "action": action,
+                "params": params or {},
+                "proxy": proxy,
+                "store": str(self.store),
+            }
+            proc = subprocess.run(
+                ["node", str(RUNNER), json.dumps(payload, ensure_ascii=False)],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=timeout,
+            )
+            if proc.returncode == 0:
+                try:
+                    data = json.loads(proc.stdout)
+                except Exception as exc:
+                    raise RuntimeError(f"源返回的不是 JSON：{proc.stdout[:200]}") from exc
+                if not data.get("ok"):
+                    raise RuntimeError(str(data.get("error"))[:300])
+                # 记住本实例命中的代理，不回写共享 cfg
+                if proxy:
+                    self.proxy = proxy
+                return data["data"]
+            last_err = RuntimeError(self._first_error(proc.stderr or proc.stdout or ""))
+            if i + 1 < len(candidates):
+                continue
+        raise RuntimeError(f"JS 源执行失败：{last_err}")
+
+    @staticmethod
+    def _first_error(stderr: str) -> str:
+        noise = (
+            "node:", "at ", "^", "...", "}", "{", "(Use", "Node.js", "code:", "throw",
+            "trigger", "Warning", "file:///", "host:", "port:", "localAddress", "address:",
+            "syscall:", "errno:", "stack:", "path:", "cause:",
+        )
+        for line in stderr.splitlines():
+            s = line.strip()
+            if s and not s.startswith(noise):
+                return s[:200]
+        return (stderr.strip().splitlines() or ["unknown"])[-1][:200]
+
+    # ---------------- 便捷方法 ----------------
+    def meta(self) -> dict:
+        return self.call("meta")
+
+    def search(self, keyword: str, page: int = 1, timeout: int = 40) -> list[dict]:
+        data = self.call("search", {"keyword": keyword, "page": page}, timeout=timeout) or {}
+        return data.get("comics") or []
+
+    def info(self, comic_id: str) -> dict:
+        return self.call("info", {"id": str(comic_id)}) or {}
+
+    def episode(self, comic_id: str, ep_id: str) -> list[str]:
+        data = self.call("ep", {"comicId": str(comic_id), "epId": str(ep_id)}) or {}
+        return data.get("images") or []
+
+
+def download_images(
+    cfg: Config, urls: list[str], out_dir: Path, referer: str = "", pause: float = 0.4
+) -> list[Path]:
+    """把一话的图片落盘，返回本地路径列表。"""
+    import time
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    saved: list[Path] = []
+    with Fetcher(cfg) as f:
+        for i, u in enumerate(urls, 1):
+            try:
+                data = f.get_bytes(u, referer=referer or None)
+            except Exception:
+                continue
+            ext = ".jpg"
+            if data[:8] == b"\x89PNG\r\n\x1a\n":
+                ext = ".png"
+            elif data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+                ext = ".webp"
+            p = out_dir / f"{i:03d}{ext}"
+            p.write_bytes(data)
+            saved.append(p)
+            time.sleep(pause)
+    return saved
+
+
+def gallery_html(title: str, images: list[Path]) -> str:
+    body = "\n".join(f'<img src="{p.name}" alt="">' for p in images)
+    return f"""<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">
+<title>{title}</title><style>
+body{{margin:0;background:#141414;color:#ddd;font-family:system-ui}}
+h1{{font-size:15px;font-weight:500;padding:12px 16px;margin:0;border-bottom:1px solid #2a2a2a}}
+.wrap{{max-width:820px;margin:0 auto;padding:10px}}
+img{{display:block;width:100%;height:auto;margin:0 0 6px;background:#222}}
+</style></head><body><h1>{title} · {len(images)} 页</h1><div class="wrap">{body}</div></body></html>"""

@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}抓取中…{% endblock %}
+{% block content %}
+<h1 class="page-title">抓取进度</h1>
+<div class="task" data-tid="{{ task.id }}">
+  <p class="mono small">{{ task.url }}</p>
+  <div class="bar big"><i id="taskBar" style="width:0%"></i></div>
+  <p id="taskText" class="muted">准备中…</p>
+  <pre id="taskLog" class="log"></pre>
+  <div id="taskDone" class="hidden">
+    <p id="taskSummary"></p>
+    <a class="btn" href="{{ url_for('book', bid=0) }}" id="toBook" hidden>打开书籍</a>
+    <a class="btn ghost" href="{{ url_for('index') }}">回书架</a>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  var root = document.querySelector('.task');
+  var tid = root.dataset.tid;
+  var bar = document.getElementById('taskBar');
+  var text = document.getElementById('taskText');
+  var log = document.getElementById('taskLog');
+  var doneBox = document.getElementById('taskDone');
+  var summary = document.getElementById('taskSummary');
+  var toBook = document.getElementById('toBook');
+  var lines = [];
+
+  function tick() {
+    fetch('/api/task/' + tid).then(r => r.json()).then(d => {
+      if (!d.ok) { text.textContent = '任务不存在'; return; }
+      if (d.status === 'running') {
+        var pct = d.total ? Math.round(100 * d.done / d.total) : 5;
+        bar.style.width = pct + '%';
+        text.textContent = '已抓 ' + d.done + ' / ' + d.total + ' 章 · ' + (d.current || '');
+        if (d.current) { lines.push(d.current); log.textContent = lines.slice(-12).join('\n'); }
+        setTimeout(tick, 1200);
+      } else if (d.status === 'done') {
+        bar.style.width = '100%';
+        var r = d.result || {};
+        text.textContent = '完成';
+        if (r.found !== undefined) {
+          summary.textContent = '发现 ' + r.found + ' 本，索引成功 ' + r.indexed +
+            ' 本，失败 ' + r.failed + ' 本，共 ' + r.chapters + ' 章目录（正文未抓）。';
+          var rows = (r.items || []).map(function (it) {
+            return (it.error ? '✗ ' : '✓ ') + (it.title || it.url) +
+              (it.error ? '：' + it.error : ' — ' + it.total + ' 章');
+          });
+          log.textContent = rows.join('\n');
+          toBook.hidden = true;
+          doneBox.classList.remove('hidden');
+          return;
+        }
+        if (r.mode === 'catalog-only') {
+          summary.textContent = '已建目录 ' + (r.total || 0) + ' 章（正文不落库，阅读时在线取）。';
+        } else {
+          summary.textContent = '新增 ' + (r.fetched || 0) + ' 章，跳过 ' + (r.skipped || 0) +
+            ' 章' + (r.failed && r.failed.length ? '，失败 ' + r.failed.length + ' 章' : '') + '。';
+        }
+        if (r.failed && r.failed.length) {
+          log.textContent = r.failed.map(f => '✗ ' + f[0] + '：' + f[1]).join('\n');
+        }
+        if (r.book_id) { toBook.hidden = false; toBook.href = '/book/' + r.book_id; }
+        doneBox.classList.remove('hidden');
+      } else {
+        text.textContent = '出错';
+        log.textContent = d.error || '';
+        doneBox.classList.remove('hidden');
+        summary.textContent = '抓取中断，可回书架点「补抓未完成章节」继续。';
+      }
+    }).catch(() => setTimeout(tick, 2500));
+  }
+  tick();
+})();
+</script>
+{% endblock %}

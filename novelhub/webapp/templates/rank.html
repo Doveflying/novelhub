@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}源排行榜{% endblock %}
+{% block content %}
+<h1 class="page-title">源排行榜 <small class="muted">
+  {% if summary %}
+    {% for k, v in summary.items() %}{{ k }} {{ v.ok }}/{{ v.total }}{% if not loop.last %} · {% endif %}{% endfor %}
+  {% endif %}
+</small></h1>
+
+<p class="muted small">
+  每个源都用同一个关键词真跑一遍，按「能不能用 + 快不快 + 结果多不多」打分（0~100，超时判 0）。
+  小说用「天使」、漫画用「海贼王」、动漫用「进击的巨人」。
+</p>
+
+<div class="card-actions">
+  <button class="btn" id="runAll">全部重测（约 2~3 分钟）</button>
+  <button class="btn ghost" id="runFast" title="逐行重测当前显示可用的源，坏源不碰">只测可用的</button>
+  <button class="btn ghost" id="pruneBad" title="把「在用但不可用」的源从聚合默认列表摘掉">摘掉在用的坏源</button>
+  <span class="muted small" id="rankStatus">
+    {% if checked_at %}上次检查：{{ checked_at }}{% else %}还没有检查记录，点上面按钮跑一次{% endif %}
+  </span>
+</div>
+
+{% if rows %}
+{% for kind, label in [('novel','小说'), ('comic','漫画'), ('anime','动漫')] %}
+{% set group = rows | selectattr('kind', 'equalto', kind) | list %}
+{% if group %}
+<h2 class="rank-h">{{ label }} <small class="muted">{{ group | length }} 个源</small></h2>
+<table class="src-table rank-table">
+  <thead>
+    <tr><th>#</th><th>源</th><th>分</th><th>耗时</th><th>结果</th><th>状态</th><th>聚合</th><th>说明</th><th></th></tr>
+  </thead>
+  <tbody>
+  {% for r in group %}
+    <tr class="{% if not r.ok %}is-bad{% elif r.count == 0 %}is-warn{% endif %}"
+        data-kind="{{ r.kind }}" data-key="{{ r.key }}" data-name="{{ r.name }}">
+      <td class="mono">{{ loop.index }}</td>
+      <td>{{ r.name }} <span class="mono small">{{ r.key }}</span></td>
+      <td class="mono"><b class="cell-score">{{ r.score }}</b></td>
+      <td class="mono cell-ms">{{ r.ms }}ms</td>
+      <td class="mono cell-count">{{ r.count }}</td>
+      <td class="cell-state">
+        {% if not r.ok %}<span class="pill bad">不可用</span>
+        {% elif r.count == 0 %}<span class="pill warn">无结果</span>
+        {% else %}<span class="pill ok">可用</span>{% endif %}
+      </td>
+      <td class="cell-use">
+        {% if r.in_use %}<span class="pill use" title="正在参与聚合搜索">在用</span>
+        {% else %}<span class="muted small">—</span>{% endif %}
+      </td>
+      <td class="small muted cell-err">{{ r.error }}</td>
+      <td><button class="btn ghost tiny retest" title="只重测这一行">重测</button></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endfor %}
+{% else %}
+<p class="muted">还没有检查数据。</p>
+{% endif %}
+
+<p class="muted small">
+  提示：分数低但有结果（比如 20 秒才回）也算能用，只是不适合放进默认聚合；
+  想让它参与聚合就去 <a href="{{ url_for('sources_page') }}">源管理</a> 勾上/取消。
+</p>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='rank.js') }}{{ '?v=' ~ asset_v }}"></script>
+{% endblock %}

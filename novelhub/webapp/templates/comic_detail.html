@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}{{ info.get('title') or key }} · 漫画{% endblock %}
+{% block content %}
+<div class="book-head">
+  <div class="book-cover">
+    {% if info.get('cover') %}
+      <img src="/api/img?u={{ info.get('cover') | urlencode }}" alt="">
+    {% else %}
+      <span class="cover-fallback">{{ (info.get('title') or key)[:2] }}</span>
+    {% endif %}
+  </div>
+  <div class="book-info">
+    <h1>{{ info.get('title') or comic_id }}</h1>
+    <p class="meta">{{ info.get('subTitle') or '' }} · 源 {{ key }}</p>
+    {% if info.get('tags') %}<p class="meta small">{{ info.get('tags') | join(' · ') }}</p>{% endif %}
+    {% if info.get('description') %}<p class="desc">{{ info.get('description') }}</p>{% endif %}
+    {% if error %}<div class="flash"><p>{{ error }}</p></div>{% endif %}
+    <p class="meta small">{{ chapters | length }} 话{% if progress %} · 读到 {{ progress.ep_title or progress.ep_id }}{% endif %}</p>
+    <div class="card-actions">
+      {% if chapters %}
+        {% if progress %}
+          <a class="btn" href="{{ url_for('comic_read', key=key, comic_id=comic_id, ep_id=progress.ep_id) }}{% if progress.ep_title %}?t={{ progress.ep_title | urlencode }}{% endif %}">继续阅读</a>
+        {% else %}
+          <a class="btn" href="{{ url_for('comic_read', key=key, comic_id=comic_id, ep_id=chapters[0][1]) }}?t={{ chapters[0][2] | urlencode }}">从第一话开始</a>
+        {% endif %}
+        <a class="btn ghost" href="{{ url_for('comics') }}">漫画书架</a>
+        <a class="btn ghost" href="{{ url_for('search', q=info.get('title') or '', kind='comic') }}">换源（找同名）</a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="toc">
+  <section class="toc-vol">
+    <h2>章节</h2>
+    <ol class="toc-list">
+      {% for group, eid, title in chapters %}
+      <li class="{% if progress and progress.ep_id == eid %}current{% endif %}">
+        <a href="{{ url_for('comic_read', key=key, comic_id=comic_id, ep_id=eid) }}?t={{ title | urlencode }}">
+          <span class="toc-title">{{ title }}</span>
+          {% if progress and progress.ep_id == eid %}<span class="tag">读到这</span>{% endif %}
+        </a>
+      </li>
+      {% endfor %}
+    </ol>
+  </section>
+</div>
+{% endblock %}

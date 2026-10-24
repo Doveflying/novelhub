@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}换源阅读 · {{ book.title }}{% endblock %}
+{% block content %}
+<h1 class="page-title">换源阅读：{{ book.title }}</h1>
+<p class="muted small">
+  当前这本来自 <b>{{ book.source }}</b>。下面是别的源里同名的书，
+  选一个就能用那个源的资源读（会作为另一份书加入书架，互不影响）。
+  查过：{{ tried | join(' / ') }}
+</p>
+
+{% if errors %}
+<p class="muted small">部分源失败：{{ errors | join('；') }}</p>
+{% endif %}
+{% if fuzzy %}
+<p class="muted small">别的源没有完全同名的书，下面是<b>相近</b>的候选，自己挑一个。</p>
+{% endif %}
+
+{% if rows %}
+<div class="hit-grid">
+  {% for r in rows %}
+  <div class="hit">
+    <span class="hit-cover">
+      {% if r.cover %}<img src="/api/img?u={{ r.cover | urlencode }}" loading="lazy" alt="">
+      {% else %}<span class="cover-fallback">{{ (r.title or '?')[:2] }}</span>{% endif %}
+    </span>
+    <span class="hit-body">
+      <span class="hit-title">{{ r.title }}</span>
+      <span class="hit-sub">{{ r.author }}{% if r.category %} · {{ r.category }}{% endif %}</span>
+      {% if r.intro %}<span class="hit-tags">{{ r.intro }}</span>{% endif %}
+      <span class="hit-src">
+        {{ r.source_name }}
+        {% if r.action == 'open' and r.book_id %}
+          · <a class="hit-act ok" href="/book/{{ r.book_id }}">已在书架，去读</a>
+        {% else %}
+          · <a class="hit-act" href="/add?url={{ r.url | urlencode }}" target="_blank" rel="noreferrer">用这个源读</a>
+        {% endif %}
+      </span>
+    </span>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<p class="muted">别的源里没找到同名书。可以把书名改得更短再搜一次，或者去<a href="/search?q={{ book.title | urlencode }}">搜索页</a>手动挑。</p>
+{% endif %}
+
+<p><a class="btn ghost" href="{{ url_for('book', bid=book.id) }}">← 回书页</a></p>
+{% endblock %}

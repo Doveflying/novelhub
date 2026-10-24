@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}搜索{% if q %} “{{ q }}”{% endif %}{% endblock %}
+{% block content %}
+<h1 class="page-title">搜索{% if q %}：{{ q }}{% endif %}</h1>
+
+{% if q %}
+<div class="tabs">
+  <a href="{{ url_for('search', q=q, kind='all') }}" class="{{ 'on' if kind == 'all' }}">全部</a>
+  <a href="{{ url_for('search', q=q, kind='novel') }}" class="{{ 'on' if kind == 'novel' }}">小说</a>
+  <a href="{{ url_for('search', q=q, kind='comic') }}" class="{{ 'on' if kind == 'comic' }}">漫画</a>
+  <a href="{{ url_for('search', q=q, kind='anime') }}" class="{{ 'on' if kind == 'anime' }}">动漫</a>
+</div>
+
+<details class="src-picker" {% if not index_count %}open{% endif %}>
+  <summary>选择源：小说 {{ novel_sources | length }} 个 · 漫画 {{ comic_sources | length }} 个</summary>
+  <div class="src-groups">
+    <div class="src-group">
+      <div class="src-group-h">
+        小说源
+        <button type="button" class="link-btn" id="novelAllOn">全选</button>
+        <button type="button" class="link-btn" id="novelAllOff">全不选</button>
+      </div>
+      {% for s in novel_sources %}
+      <label class="src-check">
+        <input type="checkbox" data-group="novel" value="{{ s.key }}" {{ 'checked' if s.enabled }}>
+        {{ s.name }}
+        {% if s.note %}<span class="mono small">{{ s.note }}</span>{% endif %}
+      </label>
+      {% endfor %}
+      <div class="idx-row">
+        <button type="button" class="btn sm" id="buildIndex">
+          {{ '建索引 / 继续扫' if not index_count else '继续扫索引（更多书）' }}
+        </button>
+        <button type="button" class="btn sm ghost" id="refreshIndex" title="只扫新书/最近更新，6 个请求左右">
+          增量刷新（捡新书）
+        </button>
+        <span class="muted small" id="idxStatus">
+          当前索引 {{ index_count }} 本；扫的是轻小说文库的榜单/分类页
+        </span>
+      </div>
+      <p class="muted small">
+        轻小说文库的站内搜索接口被 JS 门禁挡着（请求只回 200 + 空内容），
+        所以这里改成「先扫榜单建本地书目索引，再按关键词查索引」。
+      </p>
+    </div>
+    <div class="src-group">
+      <div class="src-group-h">
+        番剧源
+        <button type="button" class="link-btn" id="animeAllOn">全选</button>
+        <button type="button" class="link-btn" id="animeAllOff">全不选</button>
+      </div>
+      {% for s in anime_sources %}
+      <label class="src-check">
+        <input type="checkbox" data-group="anime" value="{{ s.key }}" {{ 'checked' if s.enabled }}>
+        {{ s.name }} <span class="mono small">{{ s.key }}</span>
+      </label>
+      {% endfor %}
+      <p class="muted small">苹果 CMS 接口，给 m3u8 直链；播放走本机切片代理。</p>
+    </div>
+    <div class="src-group">
+      <div class="src-group-h">
+        漫画源
+        <button type="button" class="link-btn" id="allOn">全选</button>
+        <button type="button" class="link-btn" id="allOff">全不选</button>
+      </div>
+      {% for s in comic_sources %}
+      <label class="src-check">
+        <input type="checkbox" data-group="comic" value="{{ s.key }}" {{ 'checked' if s.enabled }}>
+        {{ s.name }}
+        <span class="mono small">{{ s.key }}{% if s.version %} v{{ s.version }}{% endif %}</span>
+      </label>
+      {% endfor %}
+    </div>
+  </div>
+  <p class="muted small">改完直接点下面的「用这些源重搜」，或改完后刷新页面即按选择搜索。
+    只对已安装的源生效，未安装的到 <a href="{{ url_for('sources_page') }}">源管理</a> 装。</p>
+  <p><button type="button" class="btn sm" id="research">用这些源重搜</button></p>
+</details>
+
+<section class="search-block">
+  <h2>本地书库 <small>{{ results | length }} 条</small></h2>
+  {% if results %}
+  <ul class="results">
+    {% for r in results %}
+    <li>
+      <a class="r-book" href="{{ url_for('book', bid=r.book_id) }}">{{ r.book_title }}</a>
+      <a class="r-ch" href="{{ url_for('read', bid=r.book_id, idx=r.idx) }}">{{ r.title }}</a>
+      <p class="r-snip">{{ r.snippet }}</p>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="muted small">本地没有命中。</p>
+  {% endif %}
+</section>
+
+{% if kind in ('all', 'novel') %}
+<section class="search-block" id="novelBlock" hidden>
+  <h2>在线小说 <small id="novelCount"></small></h2>
+  <div class="hit-grid" id="novelHits"></div>
+</section>
+{% endif %}
+
+{% if kind in ('all', 'anime') %}
+<section class="search-block" id="animeBlock" hidden>
+  <h2>番剧 <small id="animeCount"></small></h2>
+  <div class="hit-grid" id="animeHits"></div>
+</section>
+{% endif %}
+
+{% if kind in ('all', 'comic') %}
+<section class="search-block" id="comicBlock" hidden>
+  <h2>在线漫画 <small id="comicCount"></small></h2>
+  <div class="hit-grid" id="comicHits"></div>
+</section>
+{% endif %}
+
+<p class="muted small" id="onlineStatus">正在问在线源…（多源并发，慢的会被跳过）</p>
+{% else %}
+<p class="muted">输入书名、章节名或正文片段。小说查本地书架 + 轻之文库站内搜索 +
+轻小说文库书目索引；漫画查 Venera 各源聚合，上面可以自己勾选参与搜索的源。</p>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if q %}
+{# window.NH_SEARCH 必须先于 search.js 定义，否则脚本第一行就 return 了 #}
+<script>window.NH_SEARCH = { q: {{ q | tojson }}, kind: {{ kind | tojson }} };</script>
+<script src="{{ url_for('static', filename='search.js') }}{{ '?v=' ~ asset_v }}"></script>
+{% endif %}
+{% endblock %}

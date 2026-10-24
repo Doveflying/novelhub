@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}书架 · 我的轻小说库{% endblock %}
+{% block content %}
+<div class="shelf-head">
+  <h1>书架</h1>
+  <div class="shelf-actions">
+    <a class="btn" href="{{ url_for('crawl_page') }}">＋ 抓取新书</a>
+    <a class="btn ghost" href="{{ url_for('import_page') }}">导入本地文件</a>
+  </div>
+</div>
+
+{% if not books %}
+  <div class="empty">
+    <p class="big">书架还是空的</p>
+    <p>把轻小说页面地址贴进「抓取」，或者把已有的 txt / epub 拖进「导入」。</p>
+    <p class="mono">支持站点：{{ sources | join(' / ') }}（可在 config.json 里扩展）</p>
+  </div>
+{% else %}
+  <div class="grid">
+    {% for b in books %}
+    <article class="card">
+      <a class="cover" href="{{ url_for('book', bid=b.id) }}">
+        {% if b.cover_path %}
+          <img src="{{ url_for('cover', bid=b.id) }}" alt="{{ b.title }}" loading="lazy">
+        {% elif b.cover %}
+          <img src="{{ b.cover }}" alt="{{ b.title }}" loading="lazy" referrerpolicy="no-referrer">
+        {% else %}
+          <span class="cover-fallback">{{ b.title[:2] }}</span>
+        {% endif %}
+      </a>
+      <div class="card-body">
+        <h3><a href="{{ url_for('book', bid=b.id) }}">{{ b.title }}</a></h3>
+        <p class="meta">{{ b.author or '佚名' }}{% if b.category %} · {{ b.category }}{% endif %}</p>
+        <p class="meta small">
+          {% if b.n_chapters == 0 %}
+            <span class="chip">无章节</span>
+          {% elif b.n_done == 0 %}
+            <span class="chip online">在线读</span> {{ b.n_chapters }} 章 · 不占本地
+          {% elif b.n_done >= b.n_chapters %}
+            <span class="chip done">已下载</span> {{ b.n_done }} 章 · {{ (b.n_words / 10000) | round(1) }} 万字
+          {% else %}
+            <span class="chip part">部分</span> {{ b.n_done }}/{{ b.n_chapters }} 章 · {{ (b.n_words / 10000) | round(1) }} 万字
+          {% endif %}
+        </p>
+        <div class="bar"><i style="width: {{ (100 * b.n_done / b.n_chapters) if b.n_chapters else 0 }}%"></i></div>
+        <div class="card-actions">
+          {% if b.n_done > 0 %}
+            <a class="btn sm" href="{{ url_for('read', bid=b.id, idx=(b.progress_idx if b.progress_idx is not none else 0)) }}">
+              {% if b.progress_idx is not none %}继续阅读{% else %}开始阅读{% endif %}
+            </a>
+          {% endif %}
+          <a class="btn sm ghost" href="{{ url_for('book', bid=b.id) }}">目录</a>
+          <a class="btn sm ghost" href="{{ url_for('export_book', bid=b.id, fmt='epub') }}">EPUB</a>
+          <form method="post" action="{{ url_for('delete_book', bid=b.id) }}" onsubmit="return confirm('删除《{{ b.title }}》及其全部章节？')">
+            <button class="btn sm danger" type="submit">删除</button>
+          </form>
+        </div>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+{% endif %}
+{% endblock %}

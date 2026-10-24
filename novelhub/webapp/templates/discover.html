@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}发现 · 从排行榜建书库{% endblock %}
+{% block content %}
+<h1 class="page-title">发现</h1>
+<p class="muted small">贴一个排行榜 / 分类 / 搜索结果页，解析出书单，一键批量建目录（不抓正文，几秒一本）。</p>
+
+<form class="form" method="get" action="{{ url_for('discover_page') }}">
+  <label class="field">
+    <span>列表页地址</span>
+    <input type="url" name="url" value="{{ url }}"
+           placeholder="https://www.linovelib.com/top.html">
+    <em>例：排行榜 <code>/top.html</code>、全本月点击 <code>/topfull/allvisit/1.html</code></em>
+  </label>
+  <div class="row">
+    <label class="field">
+      <span>最多解析</span>
+      <input type="number" name="top" value="30" min="1" max="200">
+    </label>
+  </div>
+  <button class="btn" type="submit">解析书单</button>
+</form>
+
+{% if error %}
+  <div class="flash"><p>{{ error }}</p></div>
+{% endif %}
+
+{% if books %}
+  <div class="discover-head">
+    <strong>{{ books | length }} 本</strong>
+    <form method="post" action="{{ url_for('discover_batch') }}" class="inline-form">
+      <input type="hidden" name="url" value="{{ url }}">
+      <input type="hidden" name="top" value="{{ books | length }}">
+      <button class="btn" type="submit">全部建目录</button>
+    </form>
+  </div>
+  <ol class="discover-list">
+    {% for b in books %}
+    <li>
+      <span class="rank">{{ loop.index }}</span>
+      <a class="d-title" href="{{ url_for('discover_page', url=b.url) }}?top=1" title="{{ b.title }}">{{ b.title or b.source_id }}</a>
+      <span class="d-src">{{ b.source }}:{{ b.source_id }}</span>
+      <a class="btn sm ghost" href="{{ b.url }}" target="_blank" rel="noreferrer">源页</a>
+    </li>
+    {% endfor %}
+  </ol>
+{% endif %}
+{% endblock %}
