@@ -46,6 +46,7 @@ class Config:
     live_cache_ttl_hours: float = 24.0  # 在线读的章节临时缓存时间（0 = 不缓存）
     prefetch_count: int = 2          # 在线读时预取后面几章
     localize_images: bool = False    # 是否把插图下载到 data/images（断网也能看）
+    convert_to_simplified: bool = True   # 繁体源（哔哩轻小说等）正文/标题转简体显示
     max_pages_per_chapter: int = 20
     # 书目索引增量刷新：多少小时跑一次（0 = 关闭自动刷新）
     # 实测站点日均新书 1~2 本、日更 3~5 本，6 小时一次足够，别一小时一次

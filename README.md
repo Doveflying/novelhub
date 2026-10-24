@@ -25,12 +25,15 @@ Windows 双击也行：`启动阅读器.bat`。
 
 ## 依赖
 
-已经在本机装好：requests / beautifulsoup4 / lxml / Flask / EbookLib。
+已经在本机装好：requests / beautifulsoup4 / lxml / Flask / EbookLib / zhconv / cryptography。
 换机器时：
 
 ```powershell
 python -m pip install -r requirements.txt
 ```
+
+`zhconv` 只用于简繁转换（没装会退回 APK 带的 OpenCC 单字表），
+`cryptography` 只用于拷贝漫画网页版的 AES 解密。
 
 ## 代理（很重要）
 
@@ -178,13 +181,31 @@ novel/
 ├── novelhub/
 │   ├── config.py            配置与代理自动探测
 │   ├── net.py               HTTP 层：重试、限速、编码识别、缓存
-│   ├── store.py             SQLite 书库（books/volumes/chapters/progress + 搜索）
+│   ├── store.py             SQLite 书库（books/volumes/chapters/progress
+│   │                        + comics/animes/read_history + 搜索）
 │   ├── crawler.py           抓取编排（目录→章节→分页合并→断点续传）
 │   ├── textutil.py          正文清洗（去广告/提示语、图片绝对化）
+│   ├── zhconvert.py         简繁转换（zhconv 优先，APK 词表兜底）
+│   ├── aggregate.py         聚合搜索（小说 / 漫画 / 动漫三路并发）
 │   ├── export.py            EPUB / TXT / MD / HTML 导出
 │   ├── importer.py          本地 txt/epub/md 导入与切章
-│   ├── sources/             站点适配器（linovelib / wenku8 / narou / generic）
-│   └── webapp/              Flask 阅读器（templates + static）
+│   ├── sources/             站点适配器
+│   │   ├── linovelib.py     哔哩轻小说（爬虫 + 书目索引）
+│   │   ├── linovel.py       轻之文库
+│   │   ├── bangumi.py       Bangumi 书目
+│   │   ├── anime.py         苹果CMS 采集接口（番剧）
+│   │   ├── copy_manga.py    拷贝漫画（网页版 + AES 解密）
+│   │   └── venera_js.py     Venera 兼容 JS 源的注册与调用
+│   ├── jsruntime/runner.mjs Node 执行器（宿主 API 对齐 Venera 的 init.js）
+│   ├── data/                内置数据（opencc 简繁词表、标签表）
+│   └── webapp/              Flask 阅读器
+│       ├── templates/       index/book/read/comics/history/animes/play/…
+│       └── static/          style.css / read.js / comic.js / search.js
+│                            / player.js / refresh.js / app.js
+├── refs/
+│   ├── venera/              Venera 源（39 个 .js）+ init.js + 清单
+│   └── anime/rules.json     Kazumi 兼容的番剧规则
+├── Venera-RE/               Venera APK 逆向产物（报告 + 反编译）
 ├── data/
 │   ├── library.db           书库
 │   ├── cache/               HTML 与图片缓存
@@ -205,8 +226,9 @@ novel/
 
 `refs/venera/` 里放的是 Venera（开源漫画阅读器）格式的源，本项目的 Node 执行器
 （`novelhub/jsruntime/runner.mjs`）实现了它的宿主 API，可以直接跑这些 `.js`：
-`Network.*`（含 cookie 罐）、`Convert.*`、`fetch`、`HtmlDocument/HtmlElement`（linkedom）、
-`Comic / ComicDetails`、`loadData/saveData`。
+`Network.*`（含 cookie 罐）、`Convert.*`（含 AES/RSA/GBK）、`fetch`、
+`HtmlDocument/HtmlElement`（linkedom）、`Comic / ComicDetails`、`loadData/saveData`、
+`loadSetting`、`log / randomInt / randomDouble / createUuid / compute`。
 
 ```powershell
 python nh.py js list                                  # 源清单 + 安装状态
@@ -215,7 +237,73 @@ python nh.py js info  ManHuaGui 51517                 # 详情 + 章节
 python nh.py js ep    zaimanhua 72283 146548          # 下载一话 + 生成预览页
 ```
 
-实测可用性（21 个源里 10 个当时可用）与原因分类见 `docs/comic-sources.md`。
+### 照着反编译出来的 APK 对齐了执行器
+
+`Venera-RE/` 里有 `com.github.wgh136.venera` v1.6.1 的逆向产物。真正有用的是它
+`assets/init.js`（宿主 API 的完整契约，37.6 KB）——里面每个方法都写清了
+`sendMessage` 的字段名和参数顺序。对着它把执行器补齐：
+
+| 补齐 | 效果 |
+|---|---|
+| `Convert.sha512` / AES ECB,CBC,CFB,OFB / `decryptRsa` | `GfmhApp` 从 0 条变 5 条；`ccc`、`jm`、`manwaba` 的加密链路能跑 |
+| `Convert.decodeGbk` | 国内站的 GBK 页面能正确解码 |
+| `Network.patch/delete/fetchBytes` | 需要 ArrayBuffer 响应的源能跑 |
+| `Network.deleteCookies` | 7 个源用它清登录态后重试 |
+| `log / randomInt / randomDouble / createUuid / compute` | 9 个源直接调用这些全局函数 |
+| `UI.*`（6 个弹窗族） | 无头环境写日志 + 返回默认值，不再抛错 |
+
+**顺手修掉两个真 bug**（不是缺 API，是语义不对）：
+
+1. `loadSetting(k)` 原来返回 `null`。Venera 的语义是"用户没改过就返回 schema 里的 default"。
+   `jm.js` 用 `parseInt(loadSetting('apiDomain')) - 1` 选镜像域名，`null` → `NaN` →
+   崩在 `jm.js:40`。现在读 `settings[k].default`，允许 store 覆盖。
+2. `init()` 没有 `await`。源普遍是 `async init()`（里面拉域名表、算签名种子），
+   原来初始化和业务并发跑，`jm` 的 `static apiDomains` 还没填就去读 → undefined。
+   现在全部 `await src.init?.()`。
+
+静态扫描 37 个源实际用到的 API：**补齐前 18/37 能跑，补齐后 37/37。**
+
+### 源仓库换了真实地址，多出 15 个源
+
+对象池里挖到 App 实际用的清单地址：
+
+```
+https://git.nyne.dev/nyne/venera-configs/raw/branch/main/index.json
+```
+
+之前用的是 jsdelivr 镜像那份（22 条），真实清单有 **31 条**。取并集后本地 **37 个**。
+新增里能跑通的：`hot_manga` 热辣漫画（20 条/1.3s）、`jcomic`（29 条/4.0s）、
+`wnacg` 紳士漫畫。新增但当前网络跑不通的见 `docs/comic-sources.md`。
+
+实测 37 个源：**10 个真能出结果、5 个空返回、22 个失败**。失败原因都不是引擎问题，
+分三类：站点的 Cloudflare / 需要浏览器 cookie（`baozi`、`mycomic`、`ccc`）、
+站点拒绝当前出口 IP 的 TLS（`ehentai`、`hitomi`、`mh18`、`hcomic`、`happy`）、
+要自建服务器（`kavita`、`komga`、`lanraragi`）。
+
+## 繁体源转简体（词表也从 APK 里拿的）
+
+哔哩轻小说的正文是繁体，读起来费劲。APK 的 `assets/opencc.txt` 是 Venera 给漫画标签
+用的 OpenCC 单字表（3980 条），复制到 `novelhub/data/opencc_s2t.txt`。
+
+但实测这表**是子集**，做正文转换会漏字：
+
+```
+這裡有一個問題，妳知道嗎？   APK表 → 这裡有一个问题，妳知道吗？
+                          zhconv → 这里有一个问题，你知道吗？
+麵包也一起吃               APK表 → 麵包也一起吃
+                          zhconv → 面包也一起吃
+```
+
+所以 `novelhub/zhconvert.py` **优先用 `zhconv`**（完整字表 + 词组消歧），
+APK 词表作为没装 zhconv 时的兜底。转换范围：阅读页正文 + 章节标题 + 书名 +
+目录页章节名 + 书架卡片标题。
+
+开关在 `config.json`：
+
+```json
+"convert_to_simplified": true
+```
+关掉就原样输出繁体。实测：`不相容的異種族妻子們` → `不相容的异种族妻子们`。
 
 ## 拷贝漫画：内置源（资源最新）
 
@@ -337,6 +425,59 @@ python nh.py batch "https://www.linovelib.com/topfull/allvisit/1.html" --top 4 -
    修好后动漫聚合 **3 条 → 19 条**（三源全回）。
 
 
+
+## 阅读历史
+
+顶栏「历史」→ 按时间倒序列出读过的东西，小说 / 漫画 / 动漫分开计数，也能按类型筛选。
+
+和「阅读进度」的区别：进度（`progress` / `comic_progress` / `anime_progress`）每个作品只存
+一条，表示"当前读到哪"；历史（`read_history`）记"读过什么"，一个作品一行，
+累加打开次数、更新最后阅读时间。所以清空历史不会丢阅读进度。
+
+| 字段 | 说明 |
+|---|---|
+| `kind` | `novel` / `comic` / `anime` |
+| `source` / `source_id` | 哪个源、哪个作品 |
+| `title` / `sub` / `cover` | 书名、作者、封面 |
+| `url` | 「继续」跳转的落地地址 |
+| `chapter_label` | 「读到 第3话 仙台同学很甜什么的」 |
+| `hits` | 打开过几次 |
+| `first_read_at` / `last_read_at` | 首次 / 最近 |
+
+写入点：打开 `/read/...`、`/comic/<源>/<id>/<话>`、`/play/<源>/<id>/<集>` 时各记一次。
+漫画的章节名是前端异步拿的，所以 `/api/comic/progress` 会顺手回填
+`chapter_label`，并且用 `bump=False` 只补字段、不重复算一次打开。
+
+历史页可以单条「移除」或「清空」（清空还能只清当前分类）。
+
+```sql
+-- 想手动看一眼
+SELECT kind, title, chapter_label, hits, last_read_at
+FROM read_history ORDER BY last_read_at DESC LIMIT 20;
+```
+
+## 加载不出来时点刷新
+
+两处入口：
+
+1. **顶栏常驻 `⟳`**（搜索框右边，主题键旁边）——任何页面都能点，直接重载当前页。
+   这是主入口：图片走 `/api/img` 代理，失败是站点/网络侧的偶发问题，常驻按钮最稳。
+2. **失败浮条**（`static/refresh.js`）——检测到失败时从底部浮出一条
+   「N 处内容没加载出来 · [刷新] · [×]」，不自动消失，自己决定刷新还是关掉。
+
+浮条检测三种情况：
+
+- `.load-fail` 失败块（正文流失败、漫画图片列表失败）——并给它补一个「刷新」按钮
+- 图片失败：`naturalWidth === 0` 且 `complete` 就是失败
+- 懒加载图不派发 `error` 的情况（Edge 会把懒加载图换成占位元素）→ 对"看着是空的"
+  图 `fetch` 一次探真实状态，只探前 20 张
+
+顺带把 `/api/img` 的失败响应从 `200 + SVG` 改成 **`502 + SVG`**：`<img>` 只有收到错误
+状态才会触发 `onerror`，页面上所有重试 UI 和浮条都靠这个事件。直接用浏览器打开那个
+URL 仍能看到 SVG 提示。
+
+阅读页本身另有一套更细的：`read.js` 的 SSE 失败会自动重连 2 次，还不行才出
+「重新加载 / 同步模式再试 / 刷新本页」；`comic.js` 的单张图失败会标红，点一下重试。
 
 ## 源管理 / 漫画进度
 
@@ -553,7 +694,8 @@ python nh.py batch    "https://www.linovelib.com/topfull/allvisit/1.html" --top 
 python selftest.py
 ```
 
-不联网，跑一遍「切章 → 入库 → 搜索 → 四种格式导出 → 阅读器路由 → 删除」，
+不联网，跑一遍「切章 → 入库 → 搜索 → 四种格式导出 → 阅读器路由 → 书目索引 →
+拷贝漫画解密 → 简繁转换 → 阅读历史 → 删除」，**33 项全绿**。
 临时库跑完自动清掉，用来确认改动没把管线弄坏。
 
 ## 常见问题

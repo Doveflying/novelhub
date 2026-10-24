@@ -3,3 +3,7 @@ beautifulsoup4>=4.12
 lxml>=5.0
 Flask>=3.0
 EbookLib>=0.18
+# 简繁转换：优先用 zhconv 的完整字表；没装则退回 APK 带的 OpenCC 单字表
+zhconv>=1.4
+# 拷贝漫画网页版内容解密（AES-CBC）
+cryptography>=41.0

@@ -38,6 +38,10 @@ class VeneraRegistry:
 
     def index(self) -> list[SourceEntry]:
         entries: list[SourceEntry] = []
+        # 按「文件名小写」去重：Windows 文件系统不区分大小写，
+        # 官方清单里的 ManHuaGui.js / Komiic.js 和本地多出来的
+        # manhuagui.js / komiic.js 会解析到同一个文件，不去重就会
+        # 在聚合搜索里把同一个源查两遍。
         seen: set[str] = set()
         if self.index_file.exists():
             try:
@@ -45,21 +49,26 @@ class VeneraRegistry:
             except Exception:
                 raw = []
             for item in raw:
-                key = item.get("key") or Path(item.get("fileName", "?")).stem
+                file = item.get("fileName", "")
+                key = item.get("key") or Path(file or "?").stem
+                dedup = (file or key).lower()
+                if dedup in seen:
+                    continue
+                seen.add(dedup)
                 entries.append(
                     SourceEntry(
                         key=key,
                         name=item.get("name", ""),
-                        file=item.get("fileName", ""),
+                        file=file,
                         version=item.get("version", ""),
                         description=item.get("description", ""),
                     )
                 )
-                seen.add(key)
         # 本地额外安装的源（比如用户丢进来的仓库压缩包）
         for p in sorted(SOURCES_DIR.glob("*.js")):
-            if p.stem in seen:
+            if p.name.lower() in seen:
                 continue
+            seen.add(p.name.lower())
             entries.append(self._entry_from_file(p))
         return entries
 

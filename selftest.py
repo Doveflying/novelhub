@@ -216,6 +216,72 @@ def main() -> int:
         except Exception as exc:  # noqa: BLE001
             ok &= check("拷贝漫画", False, str(exc))
 
+        # 5.7 简繁转换（用 Venera APK 带的 OpenCC 词表 + zhconv）
+        try:
+            from novelhub.zhconvert import (backend, has_traditional,
+                                            html_to_simplified, to_simplified)
+
+            ok &= check(
+                "简繁转换",
+                to_simplified("進擊的巨人") == "进击的巨人"
+                and to_simplified("這裡有一個問題") == "这里有一个问题"
+                and to_simplified("這個世界只有我一個人") == "这个世界只有我一个人",
+                "后端 " + backend(),
+            )
+            ok &= check(
+                "繁体判定",
+                has_traditional("這是繁體中文", 2) and not has_traditional("这是简体中文", 2),
+                "",
+            )
+            ok &= check(
+                "正文转换保留标签",
+                html_to_simplified('<p>這是<strong>繁體</strong></p><img src="a.jpg">')
+                == '<p>这是<strong>繁体</strong></p><img src="a.jpg">',
+                "",
+            )
+        except Exception as exc:  # noqa: BLE001
+            ok &= check("简繁转换", False, str(exc))
+
+        # 5.8 阅读历史：写入 / 累加 / 列表 / 删除 / 清空
+        try:
+            lib.clear_history()
+            lib.touch_history("novel", "h1", source="linovelib", title="历史测试书",
+                              sub="某人", url="/read/1/0", chapter_label="第1章")
+            lib.touch_history("novel", "h1", source="linovelib", chapter_label="第2章")
+            lib.touch_history("comic", "h2", source="copy_manga", title="历史测试漫画",
+                              url="/comic/copy_manga/h2/e1", chapter_label="第1话")
+
+            rows = lib.list_history()
+            novel = [r for r in rows if r["kind"] == "novel"]
+            ok &= check(
+                "历史写入与累加",
+                len(rows) == 2 and len(novel) == 1 and novel[0]["hits"] == 2
+                and novel[0]["chapter_label"] == "第2章",
+                "%d 条 / novel hits=%s" % (len(rows), novel[0]["hits"] if novel else "-"),
+            )
+            ok &= check(
+                "历史分类计数",
+                lib.history_count("novel") == 1 and lib.history_count("comic") == 1
+                and lib.history_count() == 2,
+                "",
+            )
+            # bump=False 只补字段不算一次打开
+            lib.touch_history("novel", "h1", source="linovelib",
+                              chapter_label="第3章", bump=False)
+            row = lib.list_history("novel")[0]
+            ok &= check(
+                "历史补字段不加次数",
+                row["hits"] == 2 and row["chapter_label"] == "第3章",
+                "hits=%d label=%s" % (row["hits"], row["chapter_label"]),
+            )
+            hid = rows[0]["id"]
+            lib.delete_history(hid)
+            ok &= check("历史删除单条", lib.history_count() == 1, "")
+            lib.clear_history()
+            ok &= check("历史清空", lib.history_count() == 0, "")
+        except Exception as exc:  # noqa: BLE001
+            ok &= check("阅读历史", False, str(exc))
+
         # 6. 清理
         lib.delete_book(bid)
         ok &= check("删除书籍", lib.get_book(bid) is None)

@@ -1,13 +1,13 @@
 {% extends "base.html" %}
-{% block title %}{{ chapter.title }} · {{ book.title }}{% endblock %}
+{% block title %}{{ chapter.title | zh }} · {{ book.title | zh }}{% endblock %}
 {% block bodyclass %}reading{% endblock %}
 {% block mainclass %}reader-main{% endblock %}
 {% block content %}
 <div class="reader-toolbar">
   <button class="icon-btn" id="tocBtn" title="目录">☰</button>
   <div class="reader-title">
-    <span class="rt-book">{{ book.title }}</span>
-    <span class="rt-ch">{{ chapter.title }}</span>
+    <span class="rt-book">{{ book.title | zh }}</span>
+    <span class="rt-ch">{{ chapter.title | zh }}</span>
   </div>
   <div class="reader-tools">
     <button class="icon-btn" id="settingsBtn" title="显示设置">Aa</button>
@@ -19,9 +19,9 @@
 <article class="reader wrap-narrow" id="reader"
          data-book="{{ book.id }}" data-idx="{{ chapter.idx }}"
          data-next="{{ next_ch.idx if next_ch else '' }}"
-         data-next-title="{{ (next_ch.title if next_ch else '') | e }}"
+         data-next-title="{{ (next_ch.title if next_ch else '') | zh | e }}"
          {% if live_defer %}data-live="1"{% endif %}>
-  <h1 class="chapter-title">{{ chapter.title }}</h1>
+  <h1 class="chapter-title">{{ chapter.title | zh }}</h1>
   <div class="chapter-meta">
     <span id="wordCount">{{ (chapter.words or 0) }}</span> 字 · {{ pos + 1 }}/{{ chapters | length }}
     {% if online %}
@@ -72,9 +72,9 @@
     {% for ch in chapters %}
       {% if ch.vol_idx != ns.v %}
         {% set ns.v = ch.vol_idx %}
-        <div class="drawer-vol">{{ volumes.get(ch.vol_idx) or ('第' ~ (ch.vol_idx + 1) ~ '卷' if ch.vol_idx else '正文') }}</div>
+        <div class="drawer-vol">{{ (volumes.get(ch.vol_idx) or ('第' ~ (ch.vol_idx + 1) ~ '卷' if ch.vol_idx else '正文')) | zh }}</div>
       {% endif %}
-      <a class="drawer-ch {% if ch.idx == chapter.idx %}on{% endif %}" href="{{ url_for('read', bid=book.id, idx=ch.idx) }}">{{ ch.title }}</a>
+      <a class="drawer-ch {% if ch.idx == chapter.idx %}on{% endif %}" href="{{ url_for('read', bid=book.id, idx=ch.idx) }}">{{ ch.title | zh }}</a>
     {% endfor %}
   </div>
 </aside>

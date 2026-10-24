@@ -21,15 +21,15 @@
     <article class="card">
       <a class="cover" href="{{ url_for('book', bid=b.id) }}">
         {% if b.cover_path %}
-          <img src="{{ url_for('cover', bid=b.id) }}" alt="{{ b.title }}" loading="lazy">
+          <img src="{{ url_for('cover', bid=b.id) }}" alt="{{ b.title | zh }}" loading="lazy">
         {% elif b.cover %}
-          <img src="{{ b.cover }}" alt="{{ b.title }}" loading="lazy" referrerpolicy="no-referrer">
+          <img src="{{ b.cover }}" alt="{{ b.title | zh }}" loading="lazy" referrerpolicy="no-referrer">
         {% else %}
-          <span class="cover-fallback">{{ b.title[:2] }}</span>
+          <span class="cover-fallback">{{ (b.title | zh)[:2] }}</span>
         {% endif %}
       </a>
       <div class="card-body">
-        <h3><a href="{{ url_for('book', bid=b.id) }}">{{ b.title }}</a></h3>
+        <h3><a href="{{ url_for('book', bid=b.id) }}">{{ b.title | zh }}</a></h3>
         <p class="meta">{{ b.author or '佚名' }}{% if b.category %} · {{ b.category }}{% endif %}</p>
         <p class="meta small">
           {% if b.n_chapters == 0 %}
@@ -51,7 +51,7 @@
           {% endif %}
           <a class="btn sm ghost" href="{{ url_for('book', bid=b.id) }}">目录</a>
           <a class="btn sm ghost" href="{{ url_for('export_book', bid=b.id, fmt='epub') }}">EPUB</a>
-          <form method="post" action="{{ url_for('delete_book', bid=b.id) }}" onsubmit="return confirm('删除《{{ b.title }}》及其全部章节？')">
+          <form method="post" action="{{ url_for('delete_book', bid=b.id) }}" onsubmit="return confirm('删除《{{ b.title | zh }}》及其全部章节？')">
             <button class="btn sm danger" type="submit">删除</button>
           </form>
         </div>

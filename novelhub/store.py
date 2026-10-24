@@ -126,6 +126,28 @@ CREATE TABLE IF NOT EXISTS anime_progress (
     PRIMARY KEY(source, source_id)
 );
 
+-- 阅读/观看历史：小说、漫画、番剧共用一张表。
+-- 和 progress / comic_progress / anime_progress 的区别：
+--   那几张是「当前读到哪」，只能存一条；这张是「读过什么」，
+--   每个作品一行，按 last_read_at 倒序就是「最近阅读」。
+CREATE TABLE IF NOT EXISTS read_history (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind          TEXT NOT NULL,              -- novel | comic | anime
+    source        TEXT NOT NULL DEFAULT '',
+    source_id     TEXT NOT NULL,
+    title         TEXT DEFAULT '',
+    sub           TEXT DEFAULT '',            -- 作者 / 集数说明
+    cover         TEXT DEFAULT '',
+    url           TEXT DEFAULT '',            -- 继续阅读的落地地址
+    chapter_label TEXT DEFAULT '',            -- 「第12章 xxx」/「第3话」/「第5集」
+    hits          INTEGER DEFAULT 1,          -- 打开过几次
+    first_read_at TEXT,
+    last_read_at  TEXT,
+    UNIQUE(kind, source, source_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_history_time ON read_history(last_read_at DESC);
+
 -- 外站书目索引（如轻小说文库的榜单/分类页扫出来的书名）
 CREATE TABLE IF NOT EXISTS novel_index (
     source     TEXT NOT NULL,
@@ -598,6 +620,88 @@ class Library:
     def all_comic_progress(self) -> dict[tuple[str, str], sqlite3.Row]:
         rows = self.conn().execute("SELECT * FROM comic_progress").fetchall()
         return {(r["source"], str(r["source_id"])): r for r in rows}
+
+    # ---------------- 阅读历史 ----------------
+    def touch_history(
+        self,
+        kind: str,
+        source_id: str,
+        *,
+        source: str = "",
+        title: str = "",
+        sub: str = "",
+        cover: str = "",
+        url: str = "",
+        chapter_label: str = "",
+        bump: bool = True,
+    ) -> None:
+        """记一条阅读历史（同一个作品只留一行，重复打开累加次数并刷新时间）。
+
+        ``bump=False`` 用于「只补字段、不算一次打开」的场景，比如前端异步
+        拿到章节名后回填标题，那种不该让 hits 加一。
+
+        失败不该影响阅读，所以调用方通常 try/except 包着；这里自己也尽量不抛。
+        """
+        if not kind or not source_id:
+            return
+        now = datetime.now().isoformat(timespec="seconds")
+        c = self.conn()
+        c.execute(
+            """
+            INSERT INTO read_history
+                (kind, source, source_id, title, sub, cover, url,
+                 chapter_label, hits, first_read_at, last_read_at)
+            VALUES (?,?,?,?,?,?,?,?,1,?,?)
+            ON CONFLICT(kind, source, source_id) DO UPDATE SET
+                title         = CASE WHEN excluded.title != '' THEN excluded.title ELSE read_history.title END,
+                sub           = CASE WHEN excluded.sub   != '' THEN excluded.sub   ELSE read_history.sub   END,
+                cover         = CASE WHEN excluded.cover != '' THEN excluded.cover ELSE read_history.cover END,
+                url           = CASE WHEN excluded.url   != '' THEN excluded.url   ELSE read_history.url   END,
+                chapter_label = CASE WHEN excluded.chapter_label != ''
+                                     THEN excluded.chapter_label
+                                     ELSE read_history.chapter_label END,
+                hits          = read_history.hits + ?,
+                last_read_at  = CASE WHEN ? = 1 THEN excluded.last_read_at
+                                     ELSE read_history.last_read_at END
+            """,
+            (kind, source, str(source_id), title, sub, cover, url,
+             chapter_label, now, now,
+             1 if bump else 0, 1 if bump else 0),
+        )
+        c.commit()
+
+    def list_history(self, kind: str | None = None, limit: int = 200) -> list[sqlite3.Row]:
+        sql = "SELECT * FROM read_history"
+        args: list = []
+        if kind:
+            sql += " WHERE kind=?"
+            args.append(kind)
+        sql += " ORDER BY last_read_at DESC, id DESC LIMIT ?"
+        args.append(int(limit))
+        return self.conn().execute(sql, args).fetchall()
+
+    def history_count(self, kind: str | None = None) -> int:
+        if kind:
+            row = self.conn().execute(
+                "SELECT COUNT(*) AS n FROM read_history WHERE kind=?", (kind,)
+            ).fetchone()
+        else:
+            row = self.conn().execute("SELECT COUNT(*) AS n FROM read_history").fetchone()
+        return int(row["n"]) if row else 0
+
+    def delete_history(self, hid: int) -> None:
+        c = self.conn()
+        c.execute("DELETE FROM read_history WHERE id=?", (int(hid),))
+        c.commit()
+
+    def clear_history(self, kind: str | None = None) -> int:
+        c = self.conn()
+        if kind:
+            cur = c.execute("DELETE FROM read_history WHERE kind=?", (kind,))
+        else:
+            cur = c.execute("DELETE FROM read_history")
+        c.commit()
+        return cur.rowcount or 0
 
     # ---------------- JS 源开关 ----------------
     def js_source_enabled(self, key: str) -> bool:

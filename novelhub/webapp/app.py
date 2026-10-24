@@ -59,6 +59,15 @@ def create_app(cfg: Config | None = None) -> Flask:
     app.secret_key = "novelhub-local-only"
     app.config["JSON_AS_ASCII"] = False
     app.jinja_env.globals.update(mode="reader")
+
+    # 繁体源（哔哩轻小说等）→ 简体显示。config.convert_to_simplified 关掉就原样输出。
+    from ..zhconvert import to_simplified as _to_simplified
+
+    @app.template_filter("zh")
+    def _zh_filter(value):
+        if not getattr(cfg, "convert_to_simplified", True):
+            return value
+        return _to_simplified(value) if isinstance(value, str) else value
     # 静态资源带版本号，避免浏览器拿旧的 js/css（改完代码刷新就生效）
     app.jinja_env.globals["asset_v"] = str(int(time.time()))
     app.extensions["library"] = lib
@@ -341,14 +350,14 @@ def create_app(cfg: Config | None = None) -> Flask:
         # 注意：persist_chapters 只决定"抓下来要不要写库"，不决定"要不要抓"
         want_live = request.args.get("live") == "1" or (not (ch and ch["html"]) and bool(b["url"]))
         live_error = ""
-        html_body = _proxyify(ch["html"], b["url"] or "") if ch and ch["html"] else _text_to_html(ch["text"] if ch else "")
+        html_body = _zhify(_proxyify(ch["html"], b["url"] or "")) if ch and ch["html"] else _text_to_html(ch["text"] if ch else "")
         online = False
         live_defer = False
         if want_live and b["url"]:
             if request.args.get("sync") == "1":
                 try:
                     _text, live_html = _live_chapter(bid, idx)
-                    html_body = _proxyify(live_html, b["url"] or "") or _text_to_html(_text)
+                    html_body = _zhify(_proxyify(live_html, b["url"] or "")) or _text_to_html(_text)
                     online = True
                     if request.args.get("noprefetch") != "1":
                         _prefetch(bid, idx, int(cfg.prefetch_count or 0))
@@ -361,6 +370,18 @@ def create_app(cfg: Config | None = None) -> Flask:
                 html_body = ""
 
         lib.set_progress(bid, idx, 0.0)
+        # 记阅读历史（同一本书只留一行，累加次数）
+        try:
+            lib.touch_history(
+                "novel", str(bid), source=(b["source"] or ""),
+                title=b["title"] or "",
+                sub=(b["author"] or ""),
+                cover=f"/cover/{bid}" if (b["cover_path"] or "") else (b["cover"] or ""),
+                url=f"/read/{bid}/{idx}",
+                chapter_label=(ch["title"] if ch else "") or f"第{idx + 1}章",
+            )
+        except Exception:  # noqa: BLE001
+            pass
         # 顺手把后面几章在后台预热：翻页/连读时就不用干等源站
         if next_ch is not None and b["url"] and request.args.get("noprefetch") != "1":
             try:
@@ -386,6 +407,17 @@ def create_app(cfg: Config | None = None) -> Flask:
                 and crawler.read_live_cache(bid, next_ch["idx"])
             ),
         )
+
+    def _zhify(html: str) -> str:
+        """正文 HTML 的繁体转简体（只动文本节点，标签和 src 保留）。"""
+        if not html or not getattr(cfg, "convert_to_simplified", True):
+            return html
+        from ..zhconvert import html_to_simplified
+
+        try:
+            return html_to_simplified(html)
+        except Exception:  # noqa: BLE001
+            return html
 
     def _text_to_html(text: str) -> str:
         from html import escape
@@ -621,8 +653,14 @@ def create_app(cfg: Config | None = None) -> Flask:
             if comics_raw is not None:
                 comic_keys = [k for k in comics_raw.split(",") if k.strip()]
             else:
+                # 没指定源时用 config 里那批"实测能跑"的默认源。
+                # 退回到全部已安装会让 37 个源一起并发，一堆慢源/坏源把聚合拖到超时。
                 disabled = set(lib.disabled_js_sources())
-                comic_keys = [
+                defaults = [
+                    k for k in (getattr(cfg, "comic_sources_default", None) or [])
+                    if k not in disabled
+                ]
+                comic_keys = defaults or [
                     e.key for e, _ in VeneraRegistry(cfg).installed() if e.key not in disabled
                 ]
 
@@ -718,6 +756,44 @@ def create_app(cfg: Config | None = None) -> Flask:
         )
 
     # ---------------- 番剧：书架 / 详情 / 播放 ----------------
+    # ---------------- 阅读历史 ----------------
+    @app.get("/history")
+    def history():
+        kind = request.args.get("kind", "").strip()
+        if kind not in ("novel", "comic", "anime"):
+            kind = ""
+        rows = lib.list_history(kind or None, limit=300)
+        items = []
+        for r in rows:
+            d = dict(r)
+            # 小说封面：优先本地文件，其次外链
+            cover = d.get("cover") or ""
+            if d["kind"] == "novel" and str(cover).startswith("/cover/"):
+                pass  # 已经是本地封面路由
+            items.append(d)
+        return render_template(
+            "history.html",
+            items=items,
+            kind=kind,
+            counts={
+                "novel": lib.history_count("novel"),
+                "comic": lib.history_count("comic"),
+                "anime": lib.history_count("anime"),
+            },
+            total=lib.history_count(),
+        )
+
+    @app.post("/history/delete/<int:hid>")
+    def history_delete(hid: int):
+        lib.delete_history(hid)
+        return redirect(url_for("history"))
+
+    @app.post("/history/clear")
+    def history_clear():
+        kind = request.form.get("kind", "").strip()
+        lib.clear_history(kind if kind in ("novel", "comic", "anime") else None)
+        return redirect(url_for("history", kind=kind) if kind else url_for("history"))
+
     @app.get("/animes")
     def animes():
         from ..sources.anime import ANIME_SOURCES
@@ -802,6 +878,18 @@ def create_app(cfg: Config | None = None) -> Flask:
         ep_i = min(max(ep_i, 0), len(eps) - 1)
         ep = eps[ep_i]
         prog = lib.get_anime_progress(source, sid)
+        # 记观看历史
+        try:
+            lib.touch_history(
+                "anime", str(sid), source=source,
+                title=(info.get("title") or sid),
+                sub=(info.get("year") or ""),
+                cover=(info.get("cover") or ""),
+                url=f"/play/{source}/{sid}/{ep_i}",
+                chapter_label=(ep.get("name") or f"第{ep_i + 1}集"),
+            )
+        except Exception:  # noqa: BLE001
+            pass
         return render_template(
             "play.html",
             info=info,
@@ -1252,7 +1340,7 @@ def create_app(cfg: Config | None = None) -> Flask:
                     ok=True,
                     online=True,
                     title=ch["title"],
-                    html=_proxyify(html, (b["url"] if b else "") or ""),
+                    html=_zhify(_proxyify(html, (b["url"] if b else "") or "")),
                     text=_text,
                     words=len(re.sub(r"\s+", "", _text or "")),
                 )
@@ -1262,7 +1350,7 @@ def create_app(cfg: Config | None = None) -> Flask:
             ok=True,
             online=False,
             title=ch["title"],
-            html=_proxyify(ch["html"], (b["url"] if b else "") or ""),
+            html=_zhify(_proxyify(ch["html"], (b["url"] if b else "") or "")),
             text=ch["text"],
             words=ch["words"],
         )
@@ -1323,7 +1411,7 @@ def create_app(cfg: Config | None = None) -> Flask:
         # 库里已有正文就直接一次给完，不必流式
         if ch["html"] and request.args.get("live") != "1":
             payload = json.dumps(
-                {"html": _proxyify(ch["html"], (b["url"] if b else "") or ""), "words": ch["words"] or 0},
+                {"html": _zhify(_proxyify(ch["html"], (b["url"] if b else "") or "")), "words": ch["words"] or 0},
                 ensure_ascii=False,
             )
             done = {"words": ch["words"] or 0, "next": meta["next"], "next_title": meta["next_title"]}
@@ -1343,7 +1431,7 @@ def create_app(cfg: Config | None = None) -> Flask:
             yield meta_line
             try:
                 for frag in crawler.iter_chapter_live(bid, idx):
-                    frag = _proxyify(frag, (b["url"] if b else "") or "")
+                    frag = _zhify(_proxyify(frag, (b["url"] if b else "") or ""))
                     n = len(re.sub(r"\s+", "", html_to_text(frag)))
                     words += n
                     yield "data: " + json.dumps(
@@ -1404,10 +1492,13 @@ def create_app(cfg: Config | None = None) -> Flask:
                     '<text x="50%" y="68%" font-size="11" fill="#aaa" text-anchor="middle">'
                     f"{str(exc)[:60]}</text></svg>"
                 ).encode("utf-8")
+                # 用 502 而不是 200：<img> 只有收到错误状态才会触发 onerror，
+                # 页面上的「刷新」浮条和插图的重试 UI 都靠这个事件。
+                # 直接拿浏览器打开这个 URL 时仍能看到这段 SVG 提示。
                 return Response(
                     svg,
                     mimetype="image/svg+xml",
-                    status=200,
+                    status=502,
                     headers={"Cache-Control": "no-store", "X-Img-Error": "1"},
                 )
         if len(data) > 25 * 1024 * 1024:
@@ -1457,6 +1548,18 @@ def create_app(cfg: Config | None = None) -> Flask:
             return jsonify(ok=False), 400
         try:
             lib.set_comic_progress(key, comic_id, ep_id, title)
+            # 章节名是前端异步拿到的，顺手回填历史里那一行的「读到第几话」
+            if title:
+                row = lib.find_comic(key, comic_id)
+                lib.touch_history(
+                    "comic", str(comic_id), source=key,
+                    title=(row["title"] if row else "") or "",
+                    sub=(row["author"] if row else "") or "",
+                    cover=(row["cover"] if row else "") or "",
+                    url=f"/comic/{key}/{comic_id}/{ep_id}",
+                    chapter_label=title,
+                    bump=False,
+                )
             return jsonify(ok=True)
         except Exception as exc:  # noqa: BLE001
             return jsonify(ok=False, error=str(exc)[:120])
@@ -1476,6 +1579,19 @@ def create_app(cfg: Config | None = None) -> Flask:
         try:
             lib.set_comic_progress(key, comic_id, ep_id, ep_title)
         except Exception:
+            pass
+        # 记历史：书名/封面从漫画书架里取（详情页打开时已经收进去了）
+        try:
+            row = lib.find_comic(key, comic_id)
+            lib.touch_history(
+                "comic", str(comic_id), source=key,
+                title=(row["title"] if row else "") or f"{key} / {comic_id}",
+                sub=(row["author"] if row else "") or "",
+                cover=(row["cover"] if row else "") or "",
+                url=f"/comic/{key}/{comic_id}/{ep_id}",
+                chapter_label=ep_title or "",
+            )
+        except Exception:  # noqa: BLE001
             pass
         return render_template(
             "comic.html", key=key, comic_id=comic_id, ep_id=ep_id, ep_title=ep_title

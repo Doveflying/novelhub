@@ -25,11 +25,13 @@
     <nav class="nav">
       <a href="{{ url_for('index') }}" class="{{ 'on' if request.endpoint in ('index', 'book', 'read') }}">小说</a>
       <a href="{{ url_for('comics') }}" class="{{ 'on' if request.endpoint in ('comics', 'comic_detail', 'comic_read') }}">漫画</a>
-      <a href="{{ url_for('animes') }}" class="{{ 'on' if request.endpoint in ('animes', 'anime_detail') }}">动漫</a>
+      <a href="{{ url_for('animes') }}" class="{{ 'on' if request.endpoint in ('animes', 'anime_detail', 'anime_play') }}">动漫</a>
+      <a href="{{ url_for('history') }}" class="{{ 'on' if request.endpoint == 'history' }}">历史</a>
       <a href="{{ url_for('discover_page') }}">发现</a>
       <a href="{{ url_for('sources_page') }}" class="{{ 'on' if request.endpoint in ('sources_page', 'sources_rank') }}">源</a>
       <a href="{{ url_for('crawl_page') }}">抓取</a>
       <a href="{{ url_for('import_page') }}">导入</a>
+      <button id="refreshBtn" class="icon-btn" title="刷新这一页（加载不出来时点这里）">⟳</button>
       <button id="themeBtn" class="icon-btn" title="切换主题">◐</button>
     </nav>
   </div>
@@ -51,6 +53,7 @@
   <span>本地书库 · 仅供个人阅读</span>
 </footer>
 <script src="{{ url_for('static', filename='app.js') }}{{ '?v=' ~ asset_v }}"></script>
+<script src="{{ url_for('static', filename='refresh.js') }}{{ '?v=' ~ asset_v }}"></script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

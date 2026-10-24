@@ -15,6 +15,7 @@
   "live_cache_ttl_hours": 24,
   "prefetch_count": 2,
   "localize_images": false,
+  "convert_to_simplified": true,
   "max_pages_per_chapter": 20,
   "index_refresh_hours": 6.0,
   "index_refresh_pages": 3,
@@ -23,9 +24,11 @@
     "zaimanhua",
     "dm5",
     "manhuaren",
+    "ManHuaGui",
     "rumanhua_fixed_v15",
     "manhuauo_banana_v2",
-    "ManHuaGui"
+    "hot_manga",
+    "jcomic"
   ],
   "anime_sources_default": [
     "girigiri",

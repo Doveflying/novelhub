@@ -236,7 +236,8 @@ def _comic_search(cfg: Config, key: str, path: Path | None, q: str, limit: int =
 
     src = JsSource(cfg, path)
     out = []
-    for c in src.search(q, 1, timeout=12)[:limit]:
+    # 大部分源 1~5s，个别（GfmhApp / comick）要 20s+；给足时间但不超过聚合总超时
+    for c in src.search(q, 1, timeout=25)[:limit]:
         out.append(
             {
                 "source": key,

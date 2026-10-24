@@ -21,13 +21,13 @@
     <article class="card">
       <a class="cover" href="{{ url_for('comic_detail', key=c.source, comic_id=c.source_id) }}">
         {% if c.cover %}
-          <img src="/api/img?u={{ c.cover | urlencode }}" alt="{{ c.title }}" loading="lazy">
+          <img src="/api/img?u={{ c.cover | urlencode }}" alt="{{ c.title | zh }}" loading="lazy">
         {% else %}
-          <span class="cover-fallback">{{ c.title[:2] }}</span>
+          <span class="cover-fallback">{{ (c.title | zh)[:2] }}</span>
         {% endif %}
       </a>
       <div class="card-body">
-        <h3><a href="{{ url_for('comic_detail', key=c.source, comic_id=c.source_id) }}">{{ c.title }}</a></h3>
+        <h3><a href="{{ url_for('comic_detail', key=c.source, comic_id=c.source_id) }}">{{ c.title | zh }}</a></h3>
         <p class="meta">{{ c.author or '佚名' }}</p>
         <p class="meta small">
           <span class="chip">{{ c.source }}</span>
@@ -45,7 +45,7 @@
           {% endif %}
           <a class="btn sm ghost" href="{{ url_for('comic_detail', key=c.source, comic_id=c.source_id) }}">章节</a>
           <form method="post" action="{{ url_for('comics_delete', cid=c.id) }}"
-                onsubmit="return confirm('从书架移除《{{ c.title }}》？')">
+                onsubmit="return confirm('从书架移除《{{ c.title | zh }}》？')">
             <button class="btn sm danger" type="submit">移除</button>
           </form>
         </div>
