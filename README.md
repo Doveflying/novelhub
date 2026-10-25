@@ -13,7 +13,46 @@
 目录导入 ─┘
 ```
 
-## 快速开始
+## 三种用法
+
+同一个书库，三种壳。数据都在 `data/library.db`，换壳不搬数据。
+
+| 用法 | 怎么起 | 适合 |
+| --- | --- | --- |
+| **独立 exe** | 双击 `dist/书萤/书萤.exe` | 不想装 Python，拷走整个文件夹就能用 |
+| **手机 / 平板** | 浏览器打开，菜单里「装到主屏」 | 躺床上看，断网也能读已缓存的章节 |
+| **命令行** | `python nh.py serve` | 改代码、调源、批量抓 |
+
+### 独立应用 exe
+
+```powershell
+python -m pip install pyinstaller
+python build\make_icons.py                    # 生成 ico / PWA 图标
+python -m PyInstaller novelhub.spec --noconfirm --clean
+# → dist\书萤\书萤.exe（onedir，整个文件夹拷走即可）
+```
+
+双击之后：单实例检查 → 选端口（8899 被占就往后找）→ 起服务 →
+用 Edge/Chrome 的 `--app` 模式开一个无地址栏窗口 → 关窗即退出。
+
+数据落在 exe 旁边的 `data/`；那个目录不可写时自动退到 `%LOCALAPPDATA%\FireflyLibrary`。
+要指定位置就设 `NOVELHUB_DATA_DIR`，要指定配置就设 `NOVELHUB_CONFIG`。
+
+命令行参数：`--no-window`（只起服务）、`--port 9000`、`--console`（保留控制台排查）。
+
+### 手机版
+
+服务起来后用手机访问同一台机器的地址（局域网要 `--host 0.0.0.0`），
+浏览器菜单选「添加到主屏幕 / 安装应用」。装完之后：
+
+- 独立窗口，没有地址栏
+- 已读过的章节离线可看（Service Worker 缓存页面外壳与静态资源）
+- 阅读页左右滑动翻章，`←` `→` 也能用
+- 底部导航和阅读工具栏都避开了刘海与小黑条
+
+移动端样式集中在 `static/mobile.css`（最后加载），改手机端只动这一个文件。
+
+### 命令行
 
 ```powershell
 cd C:\Users\韩凌云\Desktop\novel
@@ -26,6 +65,15 @@ python nh.py serve                                    # 打开 http://127.0.0.1:
 ```
 
 Windows 双击也行：`启动阅读器.bat`。
+
+### 验收脚本
+
+```powershell
+python selftest.py                 # 后端全链路自测（抓取/解析/导出/搜索/历史）
+python design\_mobile_audit.py     # 手机端：3 档视口 × 11 个页面，查横向溢出/触控尺寸/PWA 装配
+```
+
+`_mobile_audit.py` 需要先 `python nh.py serve --port 8920`，结果写到 `design/shots/_mobile.json`。
 
 ## 依赖
 
