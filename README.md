@@ -13,14 +13,15 @@
 目录导入 ─┘
 ```
 
-## 三种用法
+## 四种用法
 
-同一个书库，三种壳。数据都在 `data/library.db`，换壳不搬数据。
+同一个书库，四种壳。数据都在 `data/library.db`，换壳不搬数据。
 
 | 用法 | 怎么起 | 适合 |
 | --- | --- | --- |
-| **独立 exe** | 双击 `dist/书萤/书萤.exe` | 不想装 Python，拷走整个文件夹就能用 |
-| **手机 / 平板** | 浏览器打开，菜单里「装到主屏」 | 躺床上看，断网也能读已缓存的章节 |
+| **独立 exe** | 双击桌面「书萤」快捷方式 | 不想装 Python，拷走整个文件夹就能用 |
+| **Android APK** | 装 `dist/android/书萤-debug.apk` | 手机离线看，自带 Python 与整套后端 |
+| **手机 / 平板（免装）** | 浏览器打开，菜单里「装到主屏」 | 不想装 APK，断网也能读已缓存的章节 |
 | **命令行** | `python nh.py serve` | 改代码、调源、批量抓 |
 
 ### 独立应用 exe
@@ -29,6 +30,7 @@
 python -m pip install pyinstaller
 python build\make_icons.py                    # 生成 ico / PWA 图标
 python -m PyInstaller novelhub.spec --noconfirm --clean
+python build\make_shortcut.py                 # 桌面 + 开始菜单快捷方式
 # → dist\书萤\书萤.exe（onedir，整个文件夹拷走即可）
 ```
 
@@ -39,8 +41,35 @@ python -m PyInstaller novelhub.spec --noconfirm --clean
 要指定位置就设 `NOVELHUB_DATA_DIR`，要指定配置就设 `NOVELHUB_CONFIG`。
 
 命令行参数：`--no-window`（只起服务）、`--port 9000`、`--console`（保留控制台排查）。
+启动失败会弹窗并把堆栈写到数据目录的 `startup-error.log`。
 
-### 手机版
+`build\make_shortcut.py` 还有 `--desktop-only` / `--start-menu-only` / `--uninstall`。
+
+### Android APK
+
+用 [Chaquopy](https://chaquo.com/chaquopy/) 把 CPython 3.11 打进 APK，
+Flask 在手机本地跑，WebView 指过去。**模板、样式、业务逻辑与桌面端是同一份代码**，
+不维护第二套 UI。
+
+```powershell
+powershell -ExecutionPolicy Bypass -File android\build_apk.ps1
+# → dist\android\书萤-debug.apk（约 46 MB）
+adb install -r dist\android\书萤-debug.apk
+```
+
+`build_apk.ps1` 会自动 `sync_sources.py` 同步 Python 源码、检查工具链、
+构建后把 APK 拷回 `dist/android/`。
+
+构建需要：JDK 17、Gradle 8.9、Android SDK（minSdk 24 / targetSdk 35）。
+脚本默认在 `C:\bookfly-android` 构建 —— AGP 会拒绝含非 ASCII 字符的工程路径，
+这台机器的用户名是中文，拷到纯 ASCII 目录最省事。
+
+手机上数据在 App 私有目录（`/data/data/com.firefly.library/files/firefly/`），
+卸载即清除。默认关代理、开 `localize_images`（插图落本地，断网可看）。
+
+看日志：`adb logcat -s BookFly python.stderr`
+
+### 手机版（PWA，免装）
 
 服务起来后用手机访问同一台机器的地址（局域网要 `--host 0.0.0.0`），
 浏览器菜单选「添加到主屏幕 / 安装应用」。装完之后：
@@ -71,9 +100,15 @@ Windows 双击也行：`启动阅读器.bat`。
 ```powershell
 python selftest.py                 # 后端全链路自测（抓取/解析/导出/搜索/历史）
 python design\_mobile_audit.py     # 手机端：3 档视口 × 11 个页面，查横向溢出/触控尺寸/PWA 装配
+python design\_illus_audit.py      # 插图：真实浏览器里查 <img> 数量/是否解出像素/尺寸/溢出
 ```
 
-`_mobile_audit.py` 需要先 `python nh.py serve --port 8920`，结果写到 `design/shots/_mobile.json`。
+`_mobile_audit.py` 和 `_illus_audit.py` 需要先 `python nh.py serve --port 8920`，
+结果分别写到 `design/shots/_mobile.json` 与 `_illus.json`。
+
+插图那条为什么不能只看 HTTP 200：`/api/img` 代理失败时会返回 502 + 占位 SVG，
+`<img>` 仍然「加载成功」。所以脚本查的是 `naturalWidth > 0`（浏览器真的解出了像素）
+和盒子尺寸是否撑满正文列。
 
 ## 依赖
 
