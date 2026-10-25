@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+{% block title %}设置 · 书萤{% endblock %}
+{% block crumb %}设置{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='settings.css') }}{{ '?v=' ~ asset_v }}">{% endblock %}
+{% block content %}
+
+<section class="page-head">
+  <div>
+    <h1 class="page-title">设置</h1>
+    <p class="page-sub">本地优先。需要联网的功能都自己填凭据，程序不预置任何密钥。</p>
+  </div>
+</section>
+
+{% if saved %}
+<div class="notice notice-ok" role="status">
+  <svg class="ico sm"><use href="#i-check"/></svg>{{ saved }}
+</div>
+{% endif %}
+{% if error %}
+<div class="notice notice-bad" role="alert">
+  <svg class="ico sm"><use href="#i-x"/></svg>{{ error }}
+</div>
+{% endif %}
+
+<!-- ==================== 聊天模型 ==================== -->
+<section class="card set-card" id="chat-model">
+  <header class="set-head">
+    <div>
+      <h2 class="set-title">聊天模型 API</h2>
+      <p class="set-desc">
+        聊天页的对话由你自己的模型账号提供。填一个 OpenAI 兼容接口即可 ——
+        DeepSeek、智谱、Kimi、OpenAI，或者本机 Ollama 都行。
+      </p>
+    </div>
+    <span class="set-state {{ 'on' if chat_ready else '' }}">
+      {{ '已接通' if chat_ready else '未配置' }}
+    </span>
+  </header>
+
+  <form method="post" action="{{ url_for('settings_page') }}" class="set-form" autocomplete="off">
+    <input type="hidden" name="section" value="chat">
+
+    <label class="field">
+      <span class="field-label">服务商</span>
+      <select name="preset" id="chatPreset" class="input">
+        {% for p in providers %}
+        <option value="{{ p.id }}" data-url="{{ p.base_url }}" data-model="{{ p.model }}"
+                {{ 'selected' if p.id == chat_provider else '' }}>{{ p.label }}</option>
+        {% endfor %}
+      </select>
+      <span class="field-hint">选一个只是帮你预填地址和模型名，Key 仍然要自己填。</span>
+    </label>
+
+    <label class="field">
+      <span class="field-label">Base URL</span>
+      <input class="input" type="text" name="base_url" id="chatBase" spellcheck="false"
+             value="{{ chat.base_url or '' }}" placeholder="https://api.deepseek.com/v1">
+      <span class="field-hint">要带版本段，通常是 <code>/v1</code> 结尾。</span>
+    </label>
+
+    <label class="field">
+      <span class="field-label">API Key</span>
+      <input class="input" type="password" name="api_key" id="chatKey" spellcheck="false"
+             value="{{ chat.api_key or '' }}" placeholder="sk-…">
+      <span class="field-hint">
+        存在本机 <code>config.json</code>，不上传。留空表示不修改已保存的 Key。
+      </span>
+    </label>
+
+    <label class="field">
+      <span class="field-label">模型名</span>
+      <input class="input" type="text" name="model" id="chatModel" spellcheck="false"
+             value="{{ chat.model or '' }}" placeholder="deepseek-chat">
+    </label>
+
+    <div class="field-row">
+      <label class="field">
+        <span class="field-label">温度</span>
+        <input class="input" type="number" step="0.1" min="0" max="2" name="temperature"
+               value="{{ chat.temperature }}">
+      </label>
+      <label class="field">
+        <span class="field-label">单次最大 token</span>
+        <input class="input" type="number" min="64" max="8192" name="max_tokens"
+               value="{{ chat.max_tokens }}">
+      </label>
+    </div>
+
+    <label class="check">
+      <input type="checkbox" name="use_env_key" {{ 'checked' if chat_use_env else '' }}>
+      <span>
+        从环境变量读 Key（<code>DEEPSEEK_API_KEY</code> 等）。
+        默认关闭 —— 机器上可能残留别的程序留下的 Key，不替你决定用哪个。
+      </span>
+    </label>
+
+    <div class="set-actions">
+      <button class="btn btn-accent" type="submit">
+        <svg class="ico sm"><use href="#i-check"/></svg>保存
+      </button>
+      <button class="btn btn-ghost" type="button" id="chatTest">
+        <svg class="ico sm"><use href="#i-refresh"/></svg>测试连接
+      </button>
+      <span class="test-out" id="chatTestOut" role="status"></span>
+    </div>
+  </form>
+</section>
+
+<!-- ==================== 抓取与网络 ==================== -->
+<section class="card set-card">
+  <header class="set-head">
+    <div>
+      <h2 class="set-title">抓取与网络</h2>
+      <p class="set-desc">这些站点有 Cloudflare 与风控，请求间隔别调太小。</p>
+    </div>
+  </header>
+  <form method="post" action="{{ url_for('settings_page') }}" class="set-form">
+    <input type="hidden" name="section" value="fetch">
+    <label class="field">
+      <span class="field-label">代理</span>
+      <input class="input" type="text" name="proxy" spellcheck="false"
+             value="{{ net.proxy or '' }}" placeholder="auto / 空=直连 / http://127.0.0.1:7890">
+      <span class="field-hint"><code>auto</code> 会自动探测本机常见代理端口。</span>
+    </label>
+    <div class="field-row">
+      <label class="field">
+        <span class="field-label">请求间隔（秒）</span>
+        <input class="input" type="number" step="0.1" min="0" name="delay" value="{{ net.delay }}">
+      </label>
+      <label class="field">
+        <span class="field-label">抖动上限（秒）</span>
+        <input class="input" type="number" step="0.1" min="0" name="jitter" value="{{ net.jitter }}">
+      </label>
+    </div>
+    <label class="check">
+      <input type="checkbox" name="localize_images" {{ 'checked' if net.localize_images else '' }}>
+      <span>把插图下载到本地（断网也能看，占空间）</span>
+    </label>
+    <label class="check">
+      <input type="checkbox" name="convert_to_simplified" {{ 'checked' if net.convert_to_simplified else '' }}>
+      <span>繁体源自动转简体显示</span>
+    </label>
+    <div class="set-actions">
+      <button class="btn btn-accent" type="submit">
+        <svg class="ico sm"><use href="#i-check"/></svg>保存
+      </button>
+    </div>
+  </form>
+</section>
+
+<!-- ==================== 关于 ==================== -->
+<section class="card set-card">
+  <header class="set-head">
+    <div>
+      <h2 class="set-title">关于</h2>
+      <p class="set-desc">书萤 · 本地轻小说 / 漫画 / 动漫书房</p>
+    </div>
+  </header>
+  <dl class="set-facts">
+    <div><dt>版本</dt><dd>{{ version }}</dd></div>
+    <div><dt>数据目录</dt><dd class="mono">{{ data_dir }}</dd></div>
+    <div><dt>配置文件</dt><dd class="mono">{{ config_path }}</dd></div>
+    <div><dt>书库</dt><dd>{{ stats.books }} 本 · {{ stats.chapters }} 章</dd></div>
+  </dl>
+</section>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  'use strict';
+
+  /* 选服务商 → 预填 base_url 与模型名（不碰 Key） */
+  var preset = document.getElementById('chatPreset');
+  var base = document.getElementById('chatBase');
+  var model = document.getElementById('chatModel');
+  if (preset) {
+    preset.addEventListener('change', function () {
+      var o = preset.options[preset.selectedIndex];
+      var u = o.getAttribute('data-url') || '';
+      var m = o.getAttribute('data-model') || '';
+      if (u) base.value = u;
+      if (m) model.value = m;
+      base.focus();
+    });
+  }
+
+  /* 测试连接：只验证「地址通、Key 认、模型名存在」 */
+  var btn = document.getElementById('chatTest');
+  var out = document.getElementById('chatTestOut');
+  if (!btn) return;
+  btn.addEventListener('click', function () {
+    out.textContent = '测试中…';
+    out.className = 'test-out';
+    btn.disabled = true;
+    fetch('{{ url_for("api_chat_test") }}', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        base_url: base.value.trim(),
+        api_key: document.getElementById('chatKey').value.trim(),
+        model: model.value.trim()
+      })
+    }).then(function (r) { return r.json(); })
+      .then(function (d) {
+        out.textContent = d.message || (d.ok ? '连接正常' : '连接失败');
+        out.className = 'test-out ' + (d.ok ? 'ok' : 'bad');
+      })
+      .catch(function () {
+        out.textContent = '请求失败';
+        out.className = 'test-out bad';
+      })
+      .finally(function () { btn.disabled = false; });
+  });
+})();
+</script>
+{% endblock %}

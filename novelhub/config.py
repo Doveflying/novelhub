@@ -75,6 +75,18 @@ class Config:
         "cache_hours": 6,
         "with_related": True,        # 是否合并第三方站点弹幕
     })
+    # 聊天模型：**由用户自己填**，程序不预置任何密钥。
+    # 空着就是没配，聊天页会引导去「设置 → 聊天模型」。
+    chat: dict = field(default_factory=lambda: {
+        "provider": "",      # 只是给界面记住上次选的预设
+        "base_url": "",
+        "api_key": "",
+        "model": "",
+        "temperature": 1.0,
+        "max_tokens": 800,
+        "tools": True,
+        "history_max": 20,
+    })
 
     # ---------- 派生路径 ----------
     @property

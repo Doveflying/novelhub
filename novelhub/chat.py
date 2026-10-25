@@ -1,11 +1,15 @@
-"""Agent 伙伴：接 QQ 那套模型配置，聊天 + 帮用户查书库。
+"""Agent 伙伴：聊天 + 帮用户查本地书库。
 
 设计取舍：
 
-* **模型配置复用 QQ bot 的。** 用户已经在 ``C:\\qqbot\\config.json`` 里配好了
-  baseUrl / apiKey / model（DeepSeek），还有一套写得很细的人设。这里默认读那份，
-  省得同一把 Key 在两处维护；想在 ``config.json`` 里单独指定也可以（``chat`` 段），
-  那样优先用本地的。
+* **模型 API 由用户自己配。** 程序不预置任何 Key、不内置任何厂商凭据，
+  也不去读别处（比如某个 QQ bot）的配置。用户在「设置 → 聊天模型」里
+  填 base_url / api_key / model 即可，任何 OpenAI 兼容接口都能用
+  （DeepSeek、智谱、Kimi、Ollama、vLLM、one-api 之类都行）。
+  没配好时聊天页会显示引导，不会静默失败。
+* **本地数据默认进上下文。** 每轮都会把书库快照（书目、在读进度、
+  历史摘要）拼进 system prompt，模型不用先调工具就知道你书架上有什么；
+  需要正文细节时再走 ``search_shelf`` 等工具。
 * **工具只读 + 一个写。** 查书架、查在线源、看进度都是只读的；只有
   ``add_to_shelf`` 会改库，且必须拿到 (source, source_id) 才动手 —— 模型得先从
   搜索结果里挑出具体那一本。
@@ -18,11 +22,11 @@ import json
 import os
 import re
 import time
+import urllib.error
+import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterator, Optional
-
-QQBOT_CONFIG = Path(r"C:\qqbot\config.json")
 
 # 找不到任何配置时给一段通用人设，至少能用
 DEFAULT_PERSONA = (
@@ -88,64 +92,142 @@ class ChatConfig:
     persona_name: str = ""
     history_max: int = 20
     tools_enabled: bool = True
-    source: str = ""          # 配置从哪来：qqbot / local / default
-    provider: str = ""        # deepseek / zhipu / 自定义
+    source: str = ""          # 配置从哪来：user（用户自己填的） / env / default
+    provider: str = ""        # 用户自定义的服务商标识（不影响协议）
 
     @property
     def ready(self) -> bool:
         return bool(self.base_url and self.api_key and self.model)
 
 
-# 两家都是 OpenAI 兼容接口，只差 base_url / key / 模型名。
-# 管家那六位走智谱（glm-4-flash 免费，够用），宫城继续用 QQ 那边配好的 deepseek。
+# 只给「默认端点 + 默认模型名」做参考，**不含任何 Key**。
+# 用户选一个就能少填两栏，但 Key 必须自己给（或用环境变量）。
 PROVIDERS: dict[str, dict] = {
     "deepseek": {
+        "label": "DeepSeek",
         "base_url": "https://api.deepseek.com/v1",
-        "api_key": "${DEEPSEEK_API_KEY}",
         "model": "deepseek-chat",
         "max_tokens": 900,
     },
     "zhipu": {
+        "label": "智谱 GLM",
         "base_url": "https://open.bigmodel.cn/api/paas/v4",
-        "api_key": "${ZHIPU_API_KEY}",
         "model": "glm-4-flash",
         "max_tokens": 500,
+    },
+    "moonshot": {
+        "label": "Moonshot Kimi",
+        "base_url": "https://api.moonshot.cn/v1",
+        "model": "moonshot-v1-8k",
+        "max_tokens": 800,
+    },
+    "openai": {
+        "label": "OpenAI",
+        "base_url": "https://api.openai.com/v1",
+        "model": "gpt-4o-mini",
+        "max_tokens": 800,
+    },
+    "ollama": {
+        "label": "Ollama（本地）",
+        "base_url": "http://127.0.0.1:11434/v1",
+        "model": "qwen2.5:7b",
+        "max_tokens": 800,
+    },
+    "custom": {
+        "label": "自定义 / OpenAI 兼容",
+        "base_url": "",
+        "model": "",
+        "max_tokens": 800,
     },
 }
 
 
-def _read_qqbot() -> dict:
-    try:
-        raw = json.loads(QQBOT_CONFIG.read_text(encoding="utf-8"))
-    except Exception:  # noqa: BLE001
-        return {}
-    llm = raw.get("llm") or {}
-    persona = ((raw.get("prompt") or {}).get("system") or "").strip()
-    return {
-        "base_url": expand_env(str(llm.get("baseUrl") or "")).rstrip("/"),
-        "api_key": expand_env(str(llm.get("apiKey") or "")),
-        "model": expand_env(str(llm.get("model") or "")),
-        "temperature": float(llm.get("temperature") or 1.0),
-        "max_tokens": int(llm.get("maxTokens") or 800),
-        "timeout": int((llm.get("timeoutMs") or 60000) / 1000),
-        "persona": expand_env(persona),
-        "history_max": int(((raw.get("bot") or {}).get("historyMaxMessages")) or 20),
-    }
+def provider_catalog() -> list[dict]:
+    """给设置界面用的服务商清单（不含任何密钥）。"""
+    return [
+        {
+            "id": pid,
+            "label": spec.get("label") or pid,
+            "base_url": spec.get("base_url") or "",
+            "model": spec.get("model") or "",
+        }
+        for pid, spec in PROVIDERS.items()
+    ]
 
 
 def provider_names() -> list[str]:
     return list(PROVIDERS)
 
 
-def load_chat_config(cfg=None, provider: str = "deepseek") -> ChatConfig:
-    """``provider`` 决定用哪套模型。默认 deepseek（= QQ 那边那份配置）。
+def probe_model(base_url: str, api_key: str, model: str, timeout: int = 20) -> dict:
+    """测一次连接：地址通不通、Key 认不认、模型名存不存在。
 
-    填充顺序（后面的只补空位，不覆盖）：``config.json`` 的
-    ``chat.providers.<provider>`` → 老配置的 ``chat`` 顶层字段（仅 deepseek）→
-    QQ bot 的 ``llm`` 段（仅 deepseek，顺带把人设一起带过来）→ 内置默认。
+    故意只打 ``/models``（OpenAI 兼容接口都实现），不跑一次真实补全 ——
+    免得用户点一下「测试」就消耗额度。
+    """
+    base = (base_url or "").strip().rstrip("/")
+    key = (api_key or "").strip()
+    mdl = (model or "").strip()
+
+    if not base:
+        return {"ok": False, "message": "Base URL 没填"}
+    if not key:
+        return {"ok": False, "message": "API Key 没填"}
+    if not base.startswith(("http://", "https://")):
+        return {"ok": False, "message": "Base URL 要以 http:// 或 https:// 开头"}
+
+    url = base + "/models"
+    req = urllib.request.Request(
+        url,
+        headers={"Authorization": f"Bearer {key}", "Accept": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            raw = r.read(200_000).decode("utf-8", "replace")
+        data = json.loads(raw) if raw.strip().startswith("{") else {}
+        ids = [str(x.get("id") or "") for x in (data.get("data") or []) if isinstance(x, dict)]
+        if mdl and ids and mdl not in ids:
+            # 有的服务商 /models 只返回部分模型，所以不算硬错误，只提示
+            return {
+                "ok": True,
+                "message": f"连接正常，但模型列表里没有 {mdl}（可能仍可用）",
+                "models": ids[:8],
+            }
+        return {"ok": True, "message": f"连接正常，可用模型 {len(ids)} 个" if ids else "连接正常"}
+    except urllib.error.HTTPError as exc:
+        detail = ""
+        try:
+            detail = exc.read(500).decode("utf-8", "replace")
+        except Exception:  # noqa: BLE001
+            pass
+        hint = {
+            401: "Key 不对或已失效",
+            403: "Key 没有这个模型的权限",
+            404: "Base URL 路径不对（多半少了 /v1）",
+            429: "被限流了，稍后再试",
+        }.get(exc.code, f"HTTP {exc.code}")
+        return {"ok": False, "message": f"{hint}" + (f"：{detail[:120]}" if detail else "")}
+    except urllib.error.URLError as exc:
+        return {"ok": False, "message": f"连不上：{exc.reason}"}
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "message": f"{type(exc).__name__}: {exc}"[:160]}
+
+
+def load_chat_config(cfg=None, provider: str = "") -> ChatConfig:
+    """读聊天模型配置。
+
+    优先级（后者只补空位，不覆盖前者）：
+
+    1. ``config.json`` 的 ``chat.base_url / api_key / model``
+       —— 用户在「设置」里填的，**唯一的一等公民**
+    2. 老配置兼容：``chat.providers.<provider>`` 段
+    3. 环境变量 ``DEEPSEEK_API_KEY`` / ``ZHIPU_API_KEY`` 等（可选，方便脚本化）
+    4. 内置默认只提供 base_url 与模型名，**不提供 Key**
+
+    不再去读任何外部程序（比如某个 QQ bot）的配置文件 ——
+    那是某台机器上的个人布局，不该成为产品的默认行为。
     """
     out = ChatConfig(provider=provider)
-    builtin = dict(PROVIDERS.get(provider) or {})
     local = getattr(cfg, "chat", None) if cfg is not None else None
     if not isinstance(local, dict):
         local = {}
@@ -159,42 +241,59 @@ def load_chat_config(cfg=None, provider: str = "deepseek") -> ChatConfig:
         if key == "max_tokens":
             tokens_set = True
 
+    # 1. 用户自己填的（顶层）
+    for k in ("base_url", "api_key", "model", "persona", "persona_name"):
+        put(k, expand_env(str(local.get(k) or "")))
+    for k in ("temperature", "max_tokens", "timeout", "history_max"):
+        if local.get(k) is not None:
+            put(k, local[k], type(getattr(out, k)))
+    if out.base_url or out.api_key or out.model:
+        out.source = "user"
+
+    # 2. 老配置：providers 段（按 provider 取，或用户当前选中的那个）
     provs = local.get("providers")
-    d = provs.get(provider) if isinstance(provs, dict) else None
-    if isinstance(d, dict):
-        put("base_url", expand_env(str(d.get("base_url") or "")))
-        put("api_key", expand_env(str(d.get("api_key") or "")))
-        put("model", expand_env(str(d.get("model") or "")))
-        for k in ("temperature", "max_tokens", "timeout", "history_max"):
-            if d.get(k) is not None:
-                put(k, d[k], type(getattr(out, k)))
-        out.source = "config.providers"
-    elif provider == "deepseek":
-        # 老配置：chat 顶层的 base_url / api_key / model 当成 deepseek 的
-        for k in ("base_url", "api_key", "model", "persona", "persona_name"):
-            put(k, expand_env(str(local.get(k) or "")))
-        for k in ("temperature", "max_tokens", "timeout", "history_max"):
-            if local.get(k) is not None:
-                put(k, local[k], type(getattr(out, k)))
-        if out.base_url or out.api_key or out.model:
-            out.source = "local"
+    if isinstance(provs, dict):
+        pick = provider or str(local.get("provider") or "")
+        d = provs.get(pick) if pick else None
+        if not isinstance(d, dict) and len(provs) == 1:
+            d = next(iter(provs.values()))
+        if isinstance(d, dict):
+            put("base_url", expand_env(str(d.get("base_url") or "")))
+            put("api_key", expand_env(str(d.get("api_key") or "")))
+            put("model", expand_env(str(d.get("model") or "")))
+            for k in ("temperature", "max_tokens", "timeout", "history_max"):
+                if d.get(k) is not None:
+                    put(k, d[k], type(getattr(out, k)))
+            if not out.source and (out.base_url or out.api_key or out.model):
+                out.source = "user"
 
-    # deepseek 还没齐 → 借 QQ bot 那份（同一家 API，key 和人设都在那儿）
-    if provider == "deepseek" and not out.ready:
-        q = _read_qqbot()
-        if q:
-            out.base_url = out.base_url or q["base_url"]
-            out.api_key = out.api_key or q["api_key"]
-            out.model = out.model or q["model"]
-            out.persona = out.persona or q["persona"]
-            out.history_max = q.get("history_max") or out.history_max
-            if out.ready:
-                out.source = "qqbot"
+    # 3. 环境变量兜底 —— **默认关闭**
+    #
+    #    为什么默认关：机器上常常有别的程序留下的 DEEPSEEK_API_KEY /
+    #    ZHIPU_API_KEY（比如某个 QQ bot 配过）。如果这里默默捡起来用，
+    #    就等于「程序带着别人的密钥在跑」，用户既不知情也没授权，
+    #    换台机器还会莫名其妙失效。
+    #    想要就用 chat.use_env_key = true 显式打开。
+    if not out.api_key and local.get("use_env_key") is True:
+        pid = provider or str(local.get("provider") or "") or "deepseek"
+        env_name = {
+            "deepseek": "DEEPSEEK_API_KEY",
+            "zhipu": "ZHIPU_API_KEY",
+            "moonshot": "MOONSHOT_API_KEY",
+            "openai": "OPENAI_API_KEY",
+        }.get(pid, "")
+        if env_name:
+            v = os.environ.get(env_name) or _win_env(env_name)
+            if v:
+                out.api_key = v
+                if not out.source:
+                    out.source = "env"
 
-    # 最后用内置默认补齐（zhipu 的 key 就靠这一步从环境变量里拿）
-    for k in ("base_url", "api_key", "model"):
+    # 4. 内置只补 base_url / 模型名，不补 Key
+    builtin = dict(PROVIDERS.get(provider or str(local.get("provider") or "")) or {})
+    for k in ("base_url", "model"):
         if not getattr(out, k) and builtin.get(k):
-            setattr(out, k, expand_env(str(builtin[k])))
+            setattr(out, k, str(builtin[k]))
     if not tokens_set and builtin.get("max_tokens"):
         out.max_tokens = int(builtin["max_tokens"])
 

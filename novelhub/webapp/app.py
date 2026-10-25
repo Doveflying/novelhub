@@ -2029,9 +2029,96 @@ def create_app(cfg: Config | None = None) -> Flask:
             model=conf.model, provider=persona.provider, source=conf.source,
             tools=conf.tools_enabled, status=persona.hello(lib, cfg),
             hint="" if conf.ready else (
-                f"provider={persona.provider} 没接通：检查 config.json 的 "
-                f"chat.providers.{persona.provider} 或对应的环境变量"),
+                "还没配模型 API。去「设置 → 聊天模型」填 base_url / api_key / model，"
+                "任何 OpenAI 兼容接口都可以。"),
             roster=cast.roster(lib, cfg, _chat_ready_map()),
+        )
+
+    # ---------------- 设置 ----------------
+    @app.get("/settings")
+    def settings_page():
+        from .. import __version__
+        from ..chat import load_chat_config, provider_catalog
+        from ..config import CONFIG_PATH
+
+        chat_conf = load_chat_config(cfg)
+        try:
+            stats = lib.stats()
+        except Exception:  # noqa: BLE001
+            stats = {"books": 0, "chapters": 0}
+        return render_template(
+            "settings.html",
+            chat=chat_conf,
+            chat_ready=chat_conf.ready,
+            chat_provider=(getattr(cfg, "chat", None) or {}).get("provider") or "",
+            chat_use_env=bool((getattr(cfg, "chat", None) or {}).get("use_env_key") is True),
+            providers=provider_catalog(),
+            net=cfg,
+            stats=stats,
+            version=__version__,
+            data_dir=str(cfg.data_path),
+            config_path=str(CONFIG_PATH),
+            saved=request.args.get("saved") or "",
+            error=request.args.get("error") or "",
+        )
+
+    @app.post("/settings")
+    def settings_save():
+        section = (request.form.get("section") or "").strip()
+        chat_cfg = dict(getattr(cfg, "chat", None) or {})
+
+        if section == "chat":
+            # 空 Key 表示「不修改已保存的」，避免每次保存都要重输
+            api_key = (request.form.get("api_key") or "").strip()
+            chat_cfg["base_url"] = (request.form.get("base_url") or "").strip().rstrip("/")
+            chat_cfg["model"] = (request.form.get("model") or "").strip()
+            chat_cfg["provider"] = (request.form.get("preset") or "").strip()
+            chat_cfg["use_env_key"] = bool(request.form.get("use_env_key"))
+            if api_key:
+                chat_cfg["api_key"] = api_key
+            elif "api_key" not in chat_cfg:
+                chat_cfg["api_key"] = ""
+            for k, cast_fn in (("temperature", float), ("max_tokens", int)):
+                raw = (request.form.get(k) or "").strip()
+                if raw:
+                    try:
+                        chat_cfg[k] = cast_fn(raw)
+                    except ValueError:
+                        pass
+            cfg.chat = chat_cfg
+            cfg.save()
+            # chat_engine.conf() 每次现读 config.json，不用重载
+            return redirect(url_for("settings_page", saved="聊天模型已保存"))
+
+        if section == "fetch":
+            proxy = (request.form.get("proxy") or "").strip()
+            cfg.proxy = "auto" if proxy == "auto" else proxy
+            for k, cast_fn in (("delay", float), ("jitter", float)):
+                raw = (request.form.get(k) or "").strip()
+                if raw:
+                    try:
+                        setattr(cfg, k, cast_fn(raw))
+                    except ValueError:
+                        pass
+            cfg.localize_images = bool(request.form.get("localize_images"))
+            cfg.convert_to_simplified = bool(request.form.get("convert_to_simplified"))
+            cfg.save()
+            return redirect(url_for("settings_page", saved="抓取设置已保存"))
+
+        return redirect(url_for("settings_page", error="未知的设置分区"))
+
+    @app.post("/api/chat/test")
+    def api_chat_test():
+        """只验证「地址通 / Key 认 / 模型名存在」，不消耗对话额度。"""
+        from ..chat import probe_model
+
+        body = request.get_json(silent=True) or {}
+        return jsonify(
+            probe_model(
+                base_url=(body.get("base_url") or "").strip(),
+                api_key=(body.get("api_key") or "").strip(),
+                model=(body.get("model") or "").strip(),
+            )
         )
 
     @app.post("/api/chat/reset")

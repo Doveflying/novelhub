@@ -121,6 +121,9 @@
         <a class="rail-link {{ 'on' if cur_ep in ('sources_page', 'sources_rank') }}" href="{{ url_for('sources_page') }}" title="书源">
           <svg class="ico"><use href="#i-server"/></svg><span>书源</span>
         </a>
+        <a class="rail-link {{ 'on' if cur_ep == 'settings_page' }}" href="{{ url_for('settings_page') }}" title="设置">
+          <svg class="ico"><use href="#i-settings"/></svg><span>设置</span>
+        </a>
       </div>
     </nav>
 

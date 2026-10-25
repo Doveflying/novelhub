@@ -50,10 +50,12 @@
           <span id="imState">{{ '在线' if ready else '未接通' }}</span>
           <span class="im-sep">·</span>{{ persona.role }}
           {%- if conf.model %}<span class="im-sep">·</span>{{ conf.model }}{% endif -%}
-          {%- if persona.provider == 'deepseek' and conf.source == 'qqbot' %}<span class="im-tag" title="和 QQ 那边用的是同一份配置">同 QQ</span>{% endif -%}
         </em>
       </span>
       <div class="im-acts">
+        <a class="im-btn" href="{{ url_for('settings_page') }}#chat-model" title="配置模型 API" aria-label="配置模型 API">
+          <svg class="ico"><use href="#i-settings"/></svg>
+        </a>
         <button class="im-btn" id="imClear" type="button" title="清空和{{ persona.name }}的对话" aria-label="清空这段对话">
           <svg class="ico"><use href="#i-trash"/></svg>
         </button>
@@ -72,16 +74,22 @@
           {% for c in chips %}<button type="button" data-say="{{ c }}">{{ c }}</button>{% endfor %}
         </div>
         {% if not ready %}
-        <p class="im-warn">这个角色的模型没接通（provider = <code>{{ persona.provider }}</code>）。
-          检查 <code>config.json</code> 的 <code>chat.providers.{{ persona.provider }}</code>
-          或环境变量 <code>{{ 'ZHIPU_API_KEY' if persona.provider == 'zhipu' else 'DEEPSEEK_API_KEY' }}</code>。</p>
+        <div class="im-setup">
+          <p class="im-warn">还没配模型 API。这个功能不带任何内置密钥，需要你自己填一份。</p>
+          <p class="im-warn-sub">
+            支持任何 OpenAI 兼容接口：DeepSeek / 智谱 / Kimi / OpenAI / Ollama 本地模型都行。
+          </p>
+          <a class="btn btn-accent btn-sm" href="{{ url_for('settings_page') }}#chat-model">
+            <svg class="ico sm"><use href="#i-settings"/></svg>去配置模型
+          </a>
+        </div>
         {% endif %}
       </div>
     </div>
 
     <form class="im-compose" id="imForm" autocomplete="off">
       <textarea id="imInput" rows="1" maxlength="4000" enterkeyhint="send"
-                placeholder="{{ ('和' ~ persona.name ~ '说点什么…') if ready else '模型没接通，先去配 provider' }}"
+                placeholder="{{ ('和' ~ persona.name ~ '说点什么…') if ready else '先去设置里填模型 API' }}"
                 aria-label="输入消息"></textarea>
       <button class="im-send" id="imSend" type="submit" disabled aria-label="发送">
         <svg class="i-send" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V6"/><path d="M6.4 11.4L12 5.8l5.6 5.6"/></svg>

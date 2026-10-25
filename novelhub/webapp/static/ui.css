@@ -802,7 +802,7 @@ html[data-theme="night"] .hero-wash { opacity: .1; }
 .vol-head .tag { margin-left: 2px; }
 .vol-head .line { flex: 1; height: 1px; background: var(--line); }
 
-.chapters { display: grid; grid-template-columns: 1fr 1fr; gap: 1px 26px; }
+.chapters { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1px 26px; }
 .ch {
   display: flex;
   align-items: center;
@@ -813,6 +813,9 @@ html[data-theme="night"] .hero-wash { opacity: .1; }
   font-size: 13px;
   color: var(--ink-2);
   transition: background .12s, color .12s;
+  /* grid 项默认 min-width:auto，长标题会把列撑破；
+     显式归零，让 .name 的 ellipsis 真正生效 */
+  min-width: 0;
 }
 .ch:hover { background: var(--surface-2); color: var(--ink); }
 .ch .num { font-family: var(--font-mono); font-size: 10.5px; color: var(--muted); width: 2.6em; flex: 0 0 auto; }
