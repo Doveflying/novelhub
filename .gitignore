@@ -52,6 +52,12 @@ _probe_tab.py
 *.spec.bak
 build/icons/
 
+# ============ 发布产物（走 GitHub Releases，不进代码树） ============
+# 只提交 release/publish.py 与 release/NOTES.md
+/release/*.apk
+/release/*.zip
+/release/*.exe
+
 # ============ 设计稿截图（51MB，本地验收用；只提交原型与脚本） ============
 design/shots/
 design/*.png
