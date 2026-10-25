@@ -42,7 +42,8 @@ $env:ANDROID_HOME = "C:\Android"
 $env:ANDROID_SDK_ROOT = "C:\Android"
 $env:BOOKFLY_BUILD_PYTHON = (Get-Command python).Source
 
-Write-Host "==> 4/5 构建（$(if ($Release) {'release'} else {'debug'})）" -ForegroundColor Cyan
+$variant = if ($Release) { "release" } else { "debug" }
+Write-Host "==> 4/5 构建（$variant）" -ForegroundColor Cyan
 Push-Location $WorkDir
 try {
     $task = if ($Release) { "assembleRelease" } else { "assembleDebug" }
@@ -53,7 +54,6 @@ try {
 }
 
 Write-Host "==> 5/5 取回产物" -ForegroundColor Cyan
-$variant = if ($Release) { "release" } else { "debug" }
 $apk = Get-ChildItem "$WorkDir\app\build\outputs\apk\$variant" -Filter "*.apk" |
        Sort-Object LastWriteTime -Descending | Select-Object -First 1
 if (-not $apk) { throw "没找到 APK 产物" }

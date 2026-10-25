@@ -15,17 +15,26 @@
 </aside>
 
 <div class="two-col">
-  <form class="form" method="post" action="{{ url_for('import_upload') }}" enctype="multipart/form-data">
+  <form class="form imp-upload" id="impForm" method="post"
+        action="{{ url_for('import_upload') }}" enctype="multipart/form-data">
     <h2>上传文件</h2>
-    <label class="field">
+
+    <label class="field imp-pick" for="impFiles">
       <span>txt / epub / md，可多选</span>
-      <input type="file" name="files" multiple accept=".txt,.epub,.md,.markdown">
+      {#- accept 要同时写扩展名和 MIME：安卓的文件选择器只认 MIME，
+         光写 .epub / .md 会把这两类文件灰掉，用户选不了。 -#}
+      <input type="file" name="files" id="impFiles" multiple
+             accept=".txt,.epub,.md,.markdown,text/plain,application/epub+zip,text/markdown,text/x-markdown,application/octet-stream">
     </label>
-    <button class="btn btn-accent" type="submit">导入</button>
+
+    <div class="imp-list" id="impList" hidden></div>
+
+    <button class="btn btn-accent" type="submit" id="impSubmit">导入</button>
     <p class="muted small">TXT 会自动按「第X章 / 第X话 / 序章 / 后记 / Chapter N」切章；EPUB 按 spine 顺序与目录标题切章。</p>
+    <p class="imp-status" id="impStatus" role="status"></p>
   </form>
 
-  <form class="form" method="post" action="{{ url_for('import_local_path') }}">
+  <form class="form imp-path" method="post" action="{{ url_for('import_local_path') }}">
     <h2>从磁盘路径导入</h2>
     <label class="field">
       <span>文件或目录路径</span>
@@ -44,4 +53,81 @@
     <li>抓取的书和导入的书可以混在一个书架里，搜索会一起命中。</li>
   </ul>
 </section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  'use strict';
+  var input = document.getElementById('impFiles');
+  var list = document.getElementById('impList');
+  var form = document.getElementById('impForm');
+  var btn = document.getElementById('impSubmit');
+  var status = document.getElementById('impStatus');
+  if (!input || !form) return;
+
+  function fmt(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+  }
+
+  // 选完文件先列出来，手机上能确认选对了再提交
+  input.addEventListener('change', function () {
+    var files = input.files || [];
+    if (!files.length) { list.hidden = true; list.innerHTML = ''; return; }
+    var total = 0;
+    var html = '';
+    for (var i = 0; i < files.length; i++) {
+      total += files[i].size;
+      html += '<div class="imp-item"><b>' + files[i].name.replace(/[<>&]/g, '') +
+              '</b><span>' + fmt(files[i].size) + '</span></div>';
+    }
+    html += '<div class="imp-total">共 ' + files.length + ' 个文件，' + fmt(total) + '</div>';
+    list.innerHTML = html;
+    list.hidden = false;
+    if (status) status.textContent = '';
+  });
+
+  // 上传：手机上大文件会等很久，必须给进度，否则看着像没反应
+  form.addEventListener('submit', function (e) {
+    var files = input.files || [];
+    if (!files.length) return;             // 让后端去提示「没选文件」
+    if (!window.FormData || !window.XMLHttpRequest) return;  // 老浏览器直接原生提交
+
+    e.preventDefault();
+    var fd = new FormData();
+    for (var i = 0; i < files.length; i++) fd.append('files', files[i]);
+
+    btn.disabled = true;
+    btn.textContent = '上传中…';
+    if (status) status.textContent = '正在上传，别退出页面…';
+
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', form.action, true);
+    xhr.upload.onprogress = function (ev) {
+      if (!ev.lengthComputable || !status) return;
+      var pct = Math.round((ev.loaded / ev.total) * 100);
+      status.textContent = '上传中 ' + pct + '%';
+    };
+    xhr.onload = function () {
+      // 后端 302 跳到书页或书架，跟着跳就行
+      if (xhr.status >= 200 && xhr.status < 400) {
+        if (status) status.textContent = '导入完成，正在打开…';
+        window.location.href = xhr.responseURL || '/';
+      } else {
+        btn.disabled = false;
+        btn.textContent = '导入';
+        if (status) status.textContent = '导入失败（HTTP ' + xhr.status + '），换个文件试试';
+      }
+    };
+    xhr.onerror = function () {
+      btn.disabled = false;
+      btn.textContent = '导入';
+      if (status) status.textContent = '网络断了，重新试一次';
+    };
+    xhr.send(fd);
+  });
+})();
+</script>
 {% endblock %}

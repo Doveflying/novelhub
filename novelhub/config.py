@@ -60,6 +60,10 @@ class Config:
     # 实测站点日均新书 1~2 本、日更 3~5 本，6 小时一次足够，别一小时一次
     index_refresh_hours: float = 6.0
     index_refresh_pages: int = 3     # 每次只扫 postdate/lastupdate 头部几页
+    # 首次启动（或索引太少时）自动补索引扫多少页。0 = 关掉自动补。
+    # 哔哩轻小说站内搜索被封，只能查本地索引，所以新装必须有一段底子，
+    # 否则用户「搜什么都搜不到」。
+    index_seed_pages: int = 60
     # 聚合搜索默认只问这些"实测快"的漫画源；空 = 全部
     comic_sources_default: list = field(default_factory=list)
     anime_sources_default: list = field(default_factory=lambda: ["girigiri", "apibdzy"])
@@ -81,11 +85,19 @@ class Config:
         "provider": "",      # 只是给界面记住上次选的预设
         "base_url": "",
         "api_key": "",
-        "model": "",
+        "model": "",         # 全局默认模型（角色没单独指定时用它）
         "temperature": 1.0,
         "max_tokens": 800,
         "tools": True,
         "history_max": 20,
+        # 接入的模型列表（可加多个）。每项：
+        #   {"id": "m_xxx", "label": "显示名", "provider": "zhipu",
+        #    "base_url": "...", "model": "glm-4-flash", "api_key": "..."}
+        # 角色从这份列表里挑（persona_models: {角色id: 模型id}）。
+        "models": [],
+        # 每个角色各自用哪个模型：{"shiori": "m_xxx", ...}
+        # 兼容旧格式：值也可能是模型名（如 "glm-4-flash"）。
+        "persona_models": {},
     })
 
     # ---------- 派生路径 ----------

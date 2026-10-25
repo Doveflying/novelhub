@@ -207,3 +207,89 @@
 
 /* 独立窗口里藏掉「用浏览器打开」类提示 */
 .standalone .browser-only { display: none !important; }
+
+/* ==========================================================================
+   导入页（移动端）
+   手机上「从磁盘路径导入」没有意义（沙盒里没有 D:\ 这种路径），藏掉；
+   文件选择区做成整块可点的大按钮，安卓的文件选择器才好按。
+   ========================================================================== */
+@media (max-width: 760px), (pointer: coarse) {
+  /* 手机上不显示「磁盘路径」那一栏 —— 电脑版专属 */
+  .imp-path { display: none !important; }
+
+  .imp-pick {
+    position: relative;
+    display: block;
+    padding: 18px 16px;
+    border: 2px dashed var(--line-strong);
+    border-radius: 14px;
+    background: var(--surface-2);
+    text-align: center;
+    cursor: pointer;
+  }
+  .imp-pick::before {
+    content: "点这里选文件";
+    display: block;
+    margin-bottom: 6px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--accent);
+  }
+  .imp-pick > span { font-size: 11.5px; color: var(--muted); }
+  /* 原生 input 藏起来，用整块 label 触发；不能 display:none，否则 iOS 不弹选择器 */
+  .imp-pick input[type="file"] {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+  }
+  .imp-pick:active { border-color: var(--accent); background: var(--accent-soft); }
+
+  .imp-list {
+    margin: 12px 0 4px;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 11px;
+    background: var(--surface);
+    font-size: 12.5px;
+  }
+  .imp-item {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 3px 0;
+  }
+  .imp-item b {
+    font-weight: 500;
+    color: var(--ink-2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+  .imp-item span { flex: none; color: var(--muted); font-size: 11.5px; }
+  .imp-total {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px dashed var(--line);
+    font-size: 11.5px;
+    color: var(--accent);
+  }
+  .imp-status {
+    margin: 8px 0 0;
+    font-size: 12.5px;
+    color: var(--accent);
+    min-height: 1.2em;
+  }
+  .imp-status:empty { display: none; }
+
+  /* 导入按钮做成通栏，好点 */
+  .imp-upload .btn[type="submit"] {
+    width: 100%;
+    min-height: 46px;
+    font-size: 15px;
+    border-radius: 12px;
+  }
+}

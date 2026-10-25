@@ -4,7 +4,8 @@
 {% block mainclass %}reader-main{% endblock %}
 {% block content %}
 <div class="reader-top" id="readerTop">
-  <a class="dock-btn" href="{{ url_for('book', bid=book.id) }}" title="返回目录" aria-label="返回目录">
+  <a class="dock-btn" href="{{ url_for('book', bid=book.id) }}" id="readerBack"
+     title="返回" aria-label="返回">
     <svg class="ico sm"><use href="#i-arrow-l"/></svg>
   </a>
   <div class="rt-info">
@@ -56,7 +57,19 @@
   <div class="chapter-end">
     <div class="fin">本章完</div>
     <nav class="chapter-nav">
+      {% if prev_ch %}
+        <a class="btn btn-ghost" href="{{ url_for('read', bid=book.id, idx=prev_ch.idx) }}" rel="prev"
+           title="{{ prev_ch.title | zh }}">
+          <svg class="ico sm"><use href="#i-arrow-l"/></svg>上一章
+        </a>
+      {% endif %}
       <a class="btn btn-ghost" href="{{ url_for('book', bid=book.id) }}">回到目录</a>
+      {% if next_ch %}
+        <a class="btn btn-accent" href="{{ url_for('read', bid=book.id, idx=next_ch.idx) }}" rel="next"
+           title="{{ next_ch.title | zh }}">
+          下一章<svg class="ico sm"><use href="#i-arrow-r"/></svg>
+        </a>
+      {% endif %}
     </nav>
   </div>
 </article>
@@ -194,6 +207,20 @@
     if (!ticking) { ticking = true; requestAnimationFrame(onScroll); }
   }, { passive: true });
   onScroll();
+})();
+
+/* 阅读页没有顶部 appbar，返回键放在 reader-top：
+   有历史就退回上一页（从目录/搜索进来都自然回去），
+   没历史就按 href 回目录 —— href 保留作兜底，JS 挂了也还能用。 */
+(function () {
+  var back = document.getElementById('readerBack');
+  if (!back) return;
+  back.addEventListener('click', function (e) {
+    if (window.history.length > 1) {
+      e.preventDefault();
+      window.history.back();
+    }
+  });
 })();
 </script>
 {% endblock %}

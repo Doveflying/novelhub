@@ -261,12 +261,72 @@ def create_app(cfg: Config | None = None) -> Flask:
 
         threading.Thread(target=work, daemon=True).start()
 
+    def _start_index_seed(pages: int = 60) -> None:
+        """索引几乎是空的时候，先在后台补一批底子。
+
+        为什么需要：``refresh_index`` 只扫「最近更新/新书」的头几页，属于增量维护。
+        新装用户索引是 0，增量永远长不起来 —— 表现就是「哔哩轻小说搜啥都没有，
+        得手动点建索引」。这里在启动后自动跑一次全量扫描（默认 60 页），
+        用户不用管，索引自己就长起来了。
+        """
+        from ..sources.linovelib import build_index
+
+        with lock:
+            if index_state.get("running"):
+                return
+            index_state.update(
+                running=True,
+                mode="full",
+                pages=0,
+                budget=pages,
+                total=lib.novel_index_count("linovelib"),
+                list="首次自动补索引",
+                error="",
+                started=time.time(),
+            )
+
+        def on_progress(p: dict) -> None:
+            with lock:
+                index_state.update(
+                    pages=p.get("pages", 0),
+                    total=p.get("total", 0),
+                    list=p.get("list", ""),
+                )
+
+        def work() -> None:
+            try:
+                res = build_index(cfg, lib, budget=pages, on_progress=on_progress)
+                with lock:
+                    index_state.update(
+                        running=False,
+                        pages=res.get("pages", 0),
+                        total=res.get("total", 0),
+                        error="",
+                        done=True,
+                        last_refresh=time.time(),
+                        list=f"补索引完成：{res.get('total', 0)} 本",
+                    )
+            except Exception as exc:  # noqa: BLE001
+                with lock:
+                    index_state.update(running=False, error=str(exc)[:200])
+
+        threading.Thread(target=work, daemon=True).start()
+
     # 定时器：按 config.index_refresh_hours 周期跑增量（0 = 关）
     def _index_scheduler() -> None:
         hours = float(getattr(cfg, "index_refresh_hours", 0) or 0)
         if hours <= 0:
             return
         time.sleep(20)  # 启动后先等一下，别和首页请求抢
+        # 新装/索引太少：先补一批，别让用户自己去点「建索引」
+        try:
+            if lib.novel_index_count("linovelib") < 200:
+                seed = int(getattr(cfg, "index_seed_pages", 60) or 60)
+                _start_index_seed(seed)
+                # 给补索引留点时间，别马上又开始增量
+                time.sleep(max(60.0, min(300.0, seed * 2)))
+        except Exception:  # noqa: BLE001
+            pass
         while True:
             _start_index_refresh(hours)
             time.sleep(max(300.0, hours * 3600))
@@ -2004,10 +2064,10 @@ def create_app(cfg: Config | None = None) -> Flask:
 
     @app.get("/chat")
     def chat_page():
-        who = cast.get(request.args.get("who")).id
-        persona = cast.PERSONAS[who]
+        persona = cast.get(request.args.get("who"), cfg)
+        who = persona.id
         ready = _chat_ready_map()
-        conf = chat_engine.conf(persona.provider)
+        conf = chat_engine.conf(persona.provider, persona.id)
         return render_template(
             "chat.html",
             persona=persona,
@@ -2016,14 +2076,13 @@ def create_app(cfg: Config | None = None) -> Flask:
             ready=ready.get(persona.provider, False),
             roster=cast.roster(lib, cfg, ready),
             greeting=persona.hello(lib, cfg),
-            chips=cast.CHIPS.get(who, []),
+            chips=cast.chips(who),
         )
 
     @app.get("/api/chat/info")
     def api_chat_info():
-        who = cast.get(request.args.get("who")).id
-        persona = cast.PERSONAS[who]
-        conf = chat_engine.conf(persona.provider)
+        persona = cast.get(request.args.get("who"), cfg)
+        conf = chat_engine.conf(persona.provider, persona.id)
         return jsonify(
             ok=True, ready=conf.ready, who=persona.id, name=persona.name,
             model=conf.model, provider=persona.provider, source=conf.source,
@@ -2038,10 +2097,95 @@ def create_app(cfg: Config | None = None) -> Flask:
     @app.get("/settings")
     def settings_page():
         from .. import __version__
-        from ..chat import load_chat_config, provider_catalog
+        from ..chat import load_chat_config, pick_model_entry
         from ..config import CONFIG_PATH
 
+        chat_cfg = dict(getattr(cfg, "chat", None) or {})
+
+        # 老配置迁移：**从未有过 models 字段**、但填过单个 Key 的，转成一条记录，
+        # 这样用户打开设置页就能看到「已接入的模型」，不用重新填。
+        # 注意：models 存在但是空列表，说明用户主动删光了，不能自动复活。
+        models = chat_cfg.get("models")
+        migrated = False
+        if not isinstance(models, list):
+            models = []
+            legacy_key = str(chat_cfg.get("api_key") or "").strip()
+            legacy_model = str(chat_cfg.get("model") or "").strip()
+            if legacy_key and legacy_model:
+                models = [{
+                    "id": "m_legacy",
+                    "label": legacy_model,
+                    "provider": str(chat_cfg.get("provider") or ""),
+                    "base_url": str(chat_cfg.get("base_url") or ""),
+                    "model": legacy_model,
+                    "api_key": legacy_key,
+                }]
+                chat_cfg["models"] = models
+                cfg.chat = chat_cfg
+                migrated = True
+        if migrated:
+            try:
+                cfg.save()
+            except Exception:  # noqa: BLE001
+                pass
+
+        # 给页面看的模型清单：Key 只出掩码，明文不出服务端
+        model_rows = []
+        for m in models:
+            if not isinstance(m, dict):
+                continue
+            k = str(m.get("api_key") or "").strip()
+            if len(k) > 10:
+                hint = f"{k[:3]}…{k[-4:]}"
+            elif k:
+                hint = "已保存"
+            else:
+                hint = "未填"
+            model_rows.append({
+                "id": str(m.get("id") or ""),
+                "label": str(m.get("label") or m.get("model") or ""),
+                "provider": str(m.get("provider") or ""),
+                "base_url": str(m.get("base_url") or ""),
+                "model": str(m.get("model") or ""),
+                "key_hint": hint,
+                "has_key": bool(k),
+            })
+
         chat_conf = load_chat_config(cfg)
+        pm = chat_cfg.get("persona_models")
+        pm = dict(pm) if isinstance(pm, dict) else {}
+
+        custom = cast.custom_list(cfg)
+        custom_ids = {str(c.get("id") or "") for c in custom}
+
+        # 每个角色一行：自建角色在前（都占大管家位），后面六个内置
+        persona_rows = []
+        for p in cast.all_personas(cfg):
+            chosen = str(pm.get(p.id) or "").strip()
+            if not chosen:
+                auto = pick_model_entry(chat_cfg, p.id)
+                chosen = str(auto.get("id") or "")
+            persona_rows.append({
+                "id": p.id,
+                "name": p.name,
+                "jp": p.jp,
+                "role": p.role,
+                "color": p.color,
+                "avatar": p.avatar,
+                "model_id": chosen,
+                "is_boss": p.id == "miyagi" or p.id in custom_ids,
+                "is_custom": p.id in custom_ids,
+            })
+
+        # Key 绝不回填到页面：只给一个掩码提示，明文永远不出服务端。
+        raw_key = (chat_conf.api_key or "").strip()
+        if len(raw_key) > 10:
+            key_hint = f"{raw_key[:3]}…{raw_key[-4:]}"
+        elif raw_key:
+            key_hint = "已保存"
+        else:
+            key_hint = ""
+
         try:
             stats = lib.stats()
         except Exception:  # noqa: BLE001
@@ -2050,9 +2194,12 @@ def create_app(cfg: Config | None = None) -> Flask:
             "settings.html",
             chat=chat_conf,
             chat_ready=chat_conf.ready,
-            chat_provider=(getattr(cfg, "chat", None) or {}).get("provider") or "",
-            chat_use_env=bool((getattr(cfg, "chat", None) or {}).get("use_env_key") is True),
-            providers=provider_catalog(),
+            chat_key_hint=key_hint,
+            chat_has_key=bool(raw_key),
+            chat_base_url=chat_conf.base_url or "",
+            chat_provider=(chat_cfg.get("provider") or ""),
+            models=model_rows,
+            personas=persona_rows,
             net=cfg,
             stats=stats,
             version=__version__,
@@ -2062,33 +2209,170 @@ def create_app(cfg: Config | None = None) -> Flask:
             error=request.args.get("error") or "",
         )
 
+    def _apply_recommended(models: list[dict], existing: dict | None) -> dict:
+        """推荐分配：大管家（miyagi）用 DeepSeek，其余六个用智谱。
+
+        只补**还没分配**的角色，已经手动分过的保留原样 —— 所以加第二个模型时
+        也会把剩下的角色补上，不会因为「已经有一条」就整体跳过。
+        找不到对应服务商的模型时，那个角色就不指，交给「默认（第一个）」。
+        """
+        from .. import personas as _cast
+
+        pm = dict(existing) if isinstance(existing, dict) else {}
+
+        deep = next((m for m in models
+                     if str(m.get("provider") or "") == "deepseek"
+                     or "deepseek" in str(m.get("model") or "").lower()), None)
+        zhipu = next((m for m in models
+                      if str(m.get("provider") or "") == "zhipu"
+                      or str(m.get("model") or "").lower().startswith("glm")), None)
+
+        for p in _cast.list_all(cfg):
+            if pm.get(p.id):
+                continue                      # 已经分过，尊重用户选择
+            if p.id == "miyagi" or not p.id.startswith(
+                    ("shiori", "miku", "rin", "yuki", "aju", "shirakaba")):
+                # 大管家位（含自建角色）→ DeepSeek
+                if deep:
+                    pm[p.id] = str(deep.get("id") or "")
+            else:
+                # 六位内置 → 智谱
+                if zhipu:
+                    pm[p.id] = str(zhipu.get("id") or "")
+        return pm
+
     @app.post("/settings")
     def settings_save():
         section = (request.form.get("section") or "").strip()
         chat_cfg = dict(getattr(cfg, "chat", None) or {})
+        models = chat_cfg.get("models")
+        models = [m for m in models if isinstance(m, dict)] if isinstance(models, list) else []
 
-        if section == "chat":
-            # 空 Key 表示「不修改已保存的」，避免每次保存都要重输
+        # ---------- 添加一个模型 ----------
+        if section == "model_add":
+            provider = (request.form.get("provider") or "").strip()
+            base_url = (request.form.get("base_url") or "").strip().rstrip("/")
+            model_name = (request.form.get("model") or "").strip()
             api_key = (request.form.get("api_key") or "").strip()
-            chat_cfg["base_url"] = (request.form.get("base_url") or "").strip().rstrip("/")
-            chat_cfg["model"] = (request.form.get("model") or "").strip()
-            chat_cfg["provider"] = (request.form.get("preset") or "").strip()
-            chat_cfg["use_env_key"] = bool(request.form.get("use_env_key"))
-            if api_key:
+            label = (request.form.get("label") or "").strip()
+
+            if not model_name:
+                return redirect(url_for("settings_page", error="模型名不能为空"))
+            if not base_url:
+                from ..chat import PROVIDERS
+                base_url = str((PROVIDERS.get(provider) or {}).get("base_url") or "")
+            if not base_url:
+                return redirect(url_for("settings_page", error="要填接口地址（Base URL）"))
+            if not api_key:
+                return redirect(url_for("settings_page", error="要填这个模型的 API Key"))
+
+            import uuid
+            models.append({
+                "id": "m_" + uuid.uuid4().hex[:8],
+                "label": label or model_name,
+                "provider": provider,
+                "base_url": base_url,
+                "model": model_name,
+                "api_key": api_key,
+            })
+            chat_cfg["models"] = models
+            # 第一个模型顺便作为全局默认，保证 ready 判定能过
+            if not chat_cfg.get("model"):
+                chat_cfg["model"] = model_name
+                chat_cfg["base_url"] = base_url
                 chat_cfg["api_key"] = api_key
-            elif "api_key" not in chat_cfg:
-                chat_cfg["api_key"] = ""
-            for k, cast_fn in (("temperature", float), ("max_tokens", int)):
-                raw = (request.form.get(k) or "").strip()
-                if raw:
-                    try:
-                        chat_cfg[k] = cast_fn(raw)
-                    except ValueError:
-                        pass
+            # 推荐分配：大管家用 deepseek 那个，其余用 zhipu 那个
+            chat_cfg["persona_models"] = _apply_recommended(models,
+                                                           chat_cfg.get("persona_models"))
             cfg.chat = chat_cfg
             cfg.save()
-            # chat_engine.conf() 每次现读 config.json，不用重载
-            return redirect(url_for("settings_page", saved="聊天模型已保存"))
+            return redirect(url_for("settings_page", saved=f"已添加模型 {label or model_name}"))
+
+        # ---------- 删除一个模型 ----------
+        if section == "model_del":
+            mid = (request.form.get("model_id") or "").strip()
+            models = [m for m in models if str(m.get("id") or "") != mid]
+            chat_cfg["models"] = models
+            pm = chat_cfg.get("persona_models")
+            if isinstance(pm, dict):
+                chat_cfg["persona_models"] = {k: v for k, v in pm.items() if v != mid}
+            cfg.chat = chat_cfg
+            cfg.save()
+            return redirect(url_for("settings_page", saved="已删除模型"))
+
+        # ---------- 角色选模型 ----------
+        if section == "chat":
+            pm = chat_cfg.get("persona_models")
+            pm = dict(pm) if isinstance(pm, dict) else {}
+            valid_ids = {str(m.get("id") or "") for m in models}
+            for p in cast.list_all(cfg):
+                val = (request.form.get(f"model_{p.id}") or "").strip()
+                if val and val in valid_ids:
+                    pm[p.id] = val
+                else:
+                    pm.pop(p.id, None)
+            chat_cfg["persona_models"] = pm
+            cfg.chat = chat_cfg
+            cfg.save()
+            return redirect(url_for("settings_page", saved="已保存，可以开始聊了"))
+
+        # ---------- 自建角色：新增一条（可以加很多个，互不冲突） ----------
+        if section == "persona":
+            name = (request.form.get("p_name") or "").strip()
+            voice = (request.form.get("p_voice") or "").strip()
+            jp = (request.form.get("p_jp") or "").strip()
+            role = (request.form.get("p_role") or "").strip()
+            greeting = (request.form.get("p_greeting") or "").strip()
+            brief = (request.form.get("p_brief") or "").strip()
+
+            if not name:
+                return redirect(url_for("settings_page", error="角色名不能为空"))
+
+            items = chat_cfg.get("custom_personas")
+            items = [c for c in items if isinstance(c, dict)] if isinstance(items, list) else []
+            # 老的单数键也并进来
+            legacy = chat_cfg.pop("custom_persona", None)
+            if isinstance(legacy, dict) and str(legacy.get("name") or "").strip():
+                legacy.setdefault("id", "c_legacy")
+                items.append(legacy)
+
+            import uuid
+            items.append({
+                "id": "c_" + uuid.uuid4().hex[:8],
+                "name": name[:16],
+                "jp": jp[:24],
+                "role": role[:16] or "大管家",
+                "voice": voice[:400],
+                "greeting": greeting[:120],
+                "brief": brief[:200],
+            })
+            chat_cfg["custom_personas"] = items
+            cfg.chat = chat_cfg
+            cfg.save()
+            return redirect(url_for("settings_page",
+                                    saved=f"已加入角色「{name}」，现在共 {len(items)} 个自建角色"))
+
+        # ---------- 自建角色：删掉其中一个 ----------
+        if section == "persona_del":
+            cid = (request.form.get("persona_id") or "").strip()
+            items = chat_cfg.get("custom_personas")
+            items = [c for c in items if isinstance(c, dict)] if isinstance(items, list) else []
+            items = [c for c in items if str(c.get("id") or "") != cid]
+            chat_cfg["custom_personas"] = items
+            pm = chat_cfg.get("persona_models")
+            if isinstance(pm, dict):
+                chat_cfg["persona_models"] = {k: v for k, v in pm.items() if k != cid}
+            cfg.chat = chat_cfg
+            cfg.save()
+            return redirect(url_for("settings_page", saved="已删除该角色"))
+
+        # ---------- 自建角色：全部清掉 ----------
+        if section == "persona_reset":
+            chat_cfg["custom_personas"] = []
+            chat_cfg.pop("custom_persona", None)
+            cfg.chat = chat_cfg
+            cfg.save()
+            return redirect(url_for("settings_page", saved="已清空自建角色"))
 
         if section == "fetch":
             proxy = (request.form.get("proxy") or "").strip()
@@ -2109,22 +2393,46 @@ def create_app(cfg: Config | None = None) -> Flask:
 
     @app.post("/api/chat/test")
     def api_chat_test():
-        """只验证「地址通 / Key 认 / 模型名存在」，不消耗对话额度。"""
-        from ..chat import probe_model
+        """只验证「地址通 / Key 认 / 模型名存在」，不消耗对话额度。
+
+        页面上不显示明文 Key，所以用户可能留空 —— 这时用已保存的那把，
+        并且它始终留在服务端，不回传给浏览器。
+        """
+        from ..chat import load_chat_config, probe_model
 
         body = request.get_json(silent=True) or {}
-        return jsonify(
-            probe_model(
-                base_url=(body.get("base_url") or "").strip(),
-                api_key=(body.get("api_key") or "").strip(),
-                model=(body.get("model") or "").strip(),
-            )
-        )
+        chat_cfg = dict(getattr(cfg, "chat", None) or {})
+        pm = chat_cfg.get("persona_models")
+        pm = dict(pm) if isinstance(pm, dict) else {}
+
+        api_key = (body.get("api_key") or "").strip()
+        if not api_key:
+            api_key = str(chat_cfg.get("api_key") or "").strip()
+
+        base_url = (body.get("base_url") or "").strip()
+        model = (body.get("model") or "").strip()
+        if not model:
+            model = (next(iter(pm.values())) if pm else "") or str(chat_cfg.get("model") or "")
+        if not base_url or not model:
+            fallback = load_chat_config(cfg, str(chat_cfg.get("provider") or ""))
+            base_url = base_url or fallback.base_url
+            model = model or fallback.model
+
+        return jsonify(probe_model(base_url=base_url, api_key=api_key, model=model))
+
+    @app.post("/api/persona/generate")
+    def api_persona_generate():
+        """用户写一句设定，让模型写成一份大管家人设。"""
+        from ..chat import generate_persona
+
+        body = request.get_json(silent=True) or {}
+        brief = str(body.get("brief") or "").strip()
+        return jsonify(generate_persona(cfg, brief))
 
     @app.post("/api/chat/reset")
     def api_chat_reset():
         body = request.get_json(silent=True) or {}
-        who = cast.get(body.get("who")).id
+        who = cast.get(body.get("who"), cfg).id
         chat_engine.reset(f"{who}|{str(body.get('sid') or 'web')[:64]}")
         return jsonify(ok=True, who=who)
 
@@ -2133,7 +2441,7 @@ def create_app(cfg: Config | None = None) -> Flask:
         body = request.get_json(silent=True) or {}
         text = str(body.get("text") or "").strip()
         sid = str(body.get("sid") or "web")[:64]
-        who = cast.get(body.get("who")).id
+        who = cast.get(body.get("who"), cfg).id
         if not text:
             return jsonify(ok=False, error="空消息"), 400
         if len(text) > 4000:

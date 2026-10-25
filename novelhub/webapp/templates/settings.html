@@ -7,7 +7,7 @@
 <section class="page-head">
   <div>
     <h1 class="page-title">设置</h1>
-    <p class="page-sub">本地优先。需要联网的功能都自己填凭据，程序不预置任何密钥。</p>
+    <p class="page-sub">把模型接进来，再给角色分配。接几个都行，角色各用各的。</p>
   </div>
 </section>
 
@@ -22,99 +22,265 @@
 </div>
 {% endif %}
 
-<!-- ==================== 聊天模型 ==================== -->
+<!-- ==================== 1. 已接入的模型 ==================== -->
 <section class="card set-card" id="chat-model">
   <header class="set-head">
     <div>
-      <h2 class="set-title">聊天模型 API</h2>
+      <h2 class="set-title">接入的模型 <em class="set-count">{{ models | length }}</em></h2>
       <p class="set-desc">
-        聊天页的对话由你自己的模型账号提供。填一个 OpenAI 兼容接口即可 ——
-        DeepSeek、智谱、Kimi、OpenAI，或者本机 Ollama 都行。
+        可以接好几个（比如 DeepSeek 一个、智谱一个、本地 Ollama 一个）。下面让角色挑。
       </p>
     </div>
     <span class="set-state {{ 'on' if chat_ready else '' }}">
-      {{ '已接通' if chat_ready else '未配置' }}
+      {{ '可用' if chat_ready else '还没接' }}
     </span>
   </header>
 
-  <form method="post" action="{{ url_for('settings_page') }}" class="set-form" autocomplete="off">
-    <input type="hidden" name="section" value="chat">
-
-    <label class="field">
-      <span class="field-label">服务商</span>
-      <select name="preset" id="chatPreset" class="input">
-        {% for p in providers %}
-        <option value="{{ p.id }}" data-url="{{ p.base_url }}" data-model="{{ p.model }}"
-                {{ 'selected' if p.id == chat_provider else '' }}>{{ p.label }}</option>
-        {% endfor %}
-      </select>
-      <span class="field-hint">选一个只是帮你预填地址和模型名，Key 仍然要自己填。</span>
-    </label>
-
-    <label class="field">
-      <span class="field-label">Base URL</span>
-      <input class="input" type="text" name="base_url" id="chatBase" spellcheck="false"
-             value="{{ chat.base_url or '' }}" placeholder="https://api.deepseek.com/v1">
-      <span class="field-hint">要带版本段，通常是 <code>/v1</code> 结尾。</span>
-    </label>
-
-    <label class="field">
-      <span class="field-label">API Key</span>
-      <input class="input" type="password" name="api_key" id="chatKey" spellcheck="false"
-             value="{{ chat.api_key or '' }}" placeholder="sk-…">
-      <span class="field-hint">
-        存在本机 <code>config.json</code>，不上传。留空表示不修改已保存的 Key。
+  {% if models %}
+  <ul class="mm-list">
+    {% for m in models %}
+    <li class="mm-item">
+      <span class="mm-dot" aria-hidden="true"></span>
+      <span class="mm-main">
+        <b class="mm-label">{{ m.label }}</b>
+        <span class="mm-meta">
+          <code>{{ m.model }}</code>
+          {% if m.base_url %}<span class="mm-sep">·</span><span class="mm-url">{{ m.base_url }}</span>{% endif %}
+          <span class="mm-sep">·</span><span class="mm-key">Key {{ m.key_hint }}</span>
+        </span>
       </span>
-    </label>
+      <form method="post" action="{{ url_for('settings_page') }}" class="mm-del"
+            onsubmit="return confirm('删除模型「{{ m.label }}」？')">
+        <input type="hidden" name="section" value="model_del">
+        <input type="hidden" name="model_id" value="{{ m.id }}">
+        <button class="iconbtn mm-delbtn" type="submit" title="删除" aria-label="删除 {{ m.label }}">
+          <svg class="ico sm"><use href="#i-trash"/></svg>
+        </button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="mm-empty">还没有接入任何模型。在下面加一个就能用了。</p>
+  {% endif %}
 
-    <label class="field">
-      <span class="field-label">模型名</span>
-      <input class="input" type="text" name="model" id="chatModel" spellcheck="false"
-             value="{{ chat.model or '' }}" placeholder="deepseek-chat">
-    </label>
+  <details class="adv mm-add" {% if not models %}open{% endif %}>
+    <summary>＋ 添加模型</summary>
+    <form method="post" action="{{ url_for('settings_page') }}" class="set-form mm-addform" autocomplete="off">
+      <input type="hidden" name="section" value="model_add">
 
-    <div class="field-row">
+      <div class="field-row">
+        <label class="field">
+          <span class="field-label">服务商</span>
+          <select name="provider" id="mmProvider" class="input">
+            <option value="">自定义</option>
+            {% for pid, label in [('deepseek','DeepSeek'), ('zhipu','智谱 GLM'),
+                                  ('moonshot','Moonshot Kimi'), ('openai','OpenAI'),
+                                  ('ollama','Ollama 本地')] %}
+            <option value="{{ pid }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="field">
+          <span class="field-label">显示名（可留空）</span>
+          <input class="input" type="text" name="label" placeholder="比如：智谱 GLM-4-Flash">
+        </label>
+      </div>
+
       <label class="field">
-        <span class="field-label">温度</span>
-        <input class="input" type="number" step="0.1" min="0" max="2" name="temperature"
-               value="{{ chat.temperature }}">
+        <span class="field-label">模型名</span>
+        <input class="input" type="text" name="model" id="mmModel" spellcheck="false"
+               placeholder="glm-4-flash / deepseek-chat / qwen2.5:7b">
+        <span class="field-hint">选服务商会自动填一个，可以改成你要的那个。</span>
       </label>
+
       <label class="field">
-        <span class="field-label">单次最大 token</span>
-        <input class="input" type="number" min="64" max="8192" name="max_tokens"
-               value="{{ chat.max_tokens }}">
+        <span class="field-label">接口地址（Base URL）</span>
+        <input class="input" type="text" name="base_url" id="mmBase" spellcheck="false"
+               placeholder="https://open.bigmodel.cn/api/paas/v4">
+        <span class="field-hint">选服务商会自动填；自定义时手填，通常以 <code>/v1</code> 结尾。</span>
       </label>
+
+      <label class="field">
+        <span class="field-label">API Key</span>
+        <input class="input" type="password" name="api_key" id="mmKey" spellcheck="false"
+               value="" autocomplete="new-password" placeholder="sk-…">
+        <span class="field-hint">存在本机 <code>config.json</code>，不上传，页面也不会显示明文。</span>
+      </label>
+
+      <div class="set-actions">
+        <button class="btn btn-accent" type="submit">
+          <svg class="ico sm"><use href="#i-plus"/></svg>添加
+        </button>
+      </div>
+    </form>
+  </details>
+</section>
+
+<!-- ==================== 2. 自建角色（可加多个，都有大管家能力） ==================== -->
+<section class="card set-card" id="custom-persona">
+  <header class="set-head">
+    <div>
+      <h2 class="set-title">自建角色 <em class="set-count">{{ personas | selectattr('is_custom') | list | length }}</em></h2>
+      <p class="set-desc">
+        想要谁当大管家都行，能加好几个。自建角色有<b>大管家的全套能力</b>（书架、番剧、漫画、书源、档案都能查），
+        六位内置管家照样在。
+      </p>
+    </div>
+    {% if personas | selectattr('is_custom') | list %}
+    <form method="post" action="{{ url_for('settings_page') }}" style="margin:0"
+          onsubmit="return confirm('清空全部自建角色？')">
+      <input type="hidden" name="section" value="persona_reset">
+      <button class="btn btn-quiet btn-sm" type="submit">全部清空</button>
+    </form>
+    {% endif %}
+  </header>
+
+  {% set customs = personas | selectattr('is_custom') | list %}
+  {% if customs %}
+  <ul class="mm-list cp-list">
+    {% for p in customs %}
+    <li class="mm-item">
+      <span class="cp-face">
+        <img src="{{ url_for('static', filename='cast/miyagi-face.jpg') }}" alt="" width="36" height="36">
+      </span>
+      <span class="mm-main">
+        <b class="mm-label">{{ p.name }} <em class="cp-jp">{{ p.jp }}</em></b>
+        <span class="mm-meta">
+          <span>{{ p.role }}</span>
+          <span class="mm-sep">·</span><span class="cp-cap">大管家能力</span>
+        </span>
+      </span>
+      <form method="post" action="{{ url_for('settings_page') }}" class="mm-del" style="margin:0"
+            onsubmit="return confirm('删除角色「{{ p.name }}」？')">
+        <input type="hidden" name="section" value="persona_del">
+        <input type="hidden" name="persona_id" value="{{ p.id }}">
+        <button class="iconbtn mm-delbtn" type="submit" title="删除" aria-label="删除 {{ p.name }}">
+          <svg class="ico sm"><use href="#i-trash"/></svg>
+        </button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="mm-empty">还没有自建角色。下面写一句你想要的角色，AI 会帮你写成人设。</p>
+  {% endif %}
+
+  <details class="adv cp-add" {% if not customs %}open{% endif %}>
+    <summary>＋ 加一个角色</summary>
+
+    <div class="cp-gen">
+      <label class="field">
+        <span class="field-label">你想要什么角色？</span>
+        <input class="input" type="text" id="cpBrief" spellcheck="false"
+               placeholder="比如：说话像老夫子的毒舌女仆长 / 冷淡的军装秘书 / 爱撒娇的猫娘助理">
+        <span class="field-hint">
+          写一句话就行，点右边让 AI 写成完整人设；也可以直接手填下面的字段。
+        </span>
+      </label>
+      <button class="btn btn-accent cp-genbtn" type="button" id="cpGen">
+        <svg class="ico sm"><use href="#i-spark"/></svg>AI 写人设
+      </button>
+    </div>
+    <p class="test-out" id="cpOut" role="status"></p>
+
+    <form method="post" action="{{ url_for('settings_page') }}" class="set-form cp-form" autocomplete="off">
+      <input type="hidden" name="section" value="persona">
+      <input type="hidden" name="p_brief" id="cpBriefHidden" value="">
+
+      <div class="field-row">
+        <label class="field">
+          <span class="field-label">角色名</span>
+          <input class="input" type="text" name="p_name" id="cpName" placeholder="比如：白洲 千夏">
+        </label>
+        <label class="field">
+          <span class="field-label">身份称呼</span>
+          <input class="input" type="text" name="p_role" id="cpRole" placeholder="大管家 / 私人秘书">
+        </label>
+      </div>
+
+      <div class="field-row">
+        <label class="field">
+          <span class="field-label">假名 / 罗马音（可留空）</span>
+          <input class="input" type="text" name="p_jp" id="cpJp" placeholder="シラス チナツ">
+        </label>
+        <label class="field">
+          <span class="field-label">开场白（可留空）</span>
+          <input class="input" type="text" name="p_greeting" id="cpGreeting" placeholder="有事说事。">
+        </label>
+      </div>
+
+      <label class="field">
+        <span class="field-label">说话方式</span>
+        <textarea class="input cp-voice" name="p_voice" id="cpVoice" rows="4"
+                  placeholder="语气、句长、口头禅、怎么称呼你……写得越具体，她越像那个角色。"></textarea>
+        <span class="field-hint">留空就用大管家默认的语气。</span>
+      </label>
+
+      <div class="set-actions">
+        <button class="btn btn-accent" type="submit">
+          <svg class="ico sm"><use href="#i-plus"/></svg>加入角色
+        </button>
+      </div>
+    </form>
+  </details>
+</section>
+
+<!-- ==================== 3. 角色选模型 ==================== -->
+<section class="card set-card">
+  <header class="set-head">
+    <div>
+      <h2 class="set-title">每个角色用哪个模型</h2>
+      <p class="set-desc">
+        {% if models %}从上面接入的 {{ models | length }} 个里挑；不选就用第一个。{% else %}先在上面添加模型。{% endif %}
+      </p>
+    </div>
+  </header>
+
+  <form method="post" action="{{ url_for('settings_page') }}" class="set-form">
+    <input type="hidden" name="section" value="chat">
+    <div class="pm-list">
+      {% for p in personas %}
+      <div class="pm-row" style="--who:{{ p.color }}">
+        <span class="pm-face">
+          <img src="{{ url_for('static', filename='cast/' ~ p.avatar ~ '-face.jpg') }}"
+               alt="{{ p.name }}" width="40" height="40" loading="lazy">
+        </span>
+        <span class="pm-who">
+          <b class="pm-name">{{ p.name }} <em>{{ p.jp }}</em>
+            {% if p.is_custom %}<span class="pm-tag pm-tag-custom">自建</span>
+            {% elif p.is_boss %}<span class="pm-tag">大管家</span>{% endif %}
+          </b>
+          <span class="pm-role">{{ p.role }}</span>
+        </span>
+        <span class="pm-pick">
+          <select class="input" name="model_{{ p.id }}" aria-label="{{ p.name }} 用的模型"
+                  {{ 'disabled' if not models else '' }}>
+            <option value="">{% if models %}默认（{{ models[0].label }}）{% else %}还没接入模型{% endif %}</option>
+            {% for m in models %}
+            <option value="{{ m.id }}" {{ 'selected' if p.model_id == m.id else '' }}>{{ m.label }}</option>
+            {% endfor %}
+          </select>
+        </span>
+      </div>
+      {% endfor %}
     </div>
 
-    <label class="check">
-      <input type="checkbox" name="use_env_key" {{ 'checked' if chat_use_env else '' }}>
-      <span>
-        从环境变量读 Key（<code>DEEPSEEK_API_KEY</code> 等）。
-        默认关闭 —— 机器上可能残留别的程序留下的 Key，不替你决定用哪个。
-      </span>
-    </label>
-
-    <div class="set-actions">
-      <button class="btn btn-accent" type="submit">
-        <svg class="ico sm"><use href="#i-check"/></svg>保存
+    <div class="set-actions set-actions-sticky">
+      <button class="btn btn-accent btn-lg" type="submit" {{ 'disabled' if not models else '' }}>
+        <svg class="ico sm"><use href="#i-check"/></svg>保存分配
       </button>
-      <button class="btn btn-ghost" type="button" id="chatTest">
-        <svg class="ico sm"><use href="#i-refresh"/></svg>测试连接
-      </button>
-      <span class="test-out" id="chatTestOut" role="status"></span>
+      <span class="field-hint">保存后去「聊天」就能说话。</span>
     </div>
   </form>
 </section>
 
-<!-- ==================== 抓取与网络 ==================== -->
-<section class="card set-card">
-  <header class="set-head">
-    <div>
-      <h2 class="set-title">抓取与网络</h2>
-      <p class="set-desc">这些站点有 Cloudflare 与风控，请求间隔别调太小。</p>
-    </div>
-  </header>
-  <form method="post" action="{{ url_for('settings_page') }}" class="set-form">
+<!-- ==================== 抓取与网络（进阶） ==================== -->
+<details class="card set-card set-adv-card">
+  <summary class="set-adv-summary">
+    <svg class="ico sm"><use href="#i-server"/></svg>抓取与网络（进阶，一般不用动）
+  </summary>
+  <form method="post" action="{{ url_for('settings_page') }}" class="set-form set-adv-body">
     <input type="hidden" name="section" value="fetch">
     <label class="field">
       <span class="field-label">代理</span>
@@ -141,12 +307,12 @@
       <span>繁体源自动转简体显示</span>
     </label>
     <div class="set-actions">
-      <button class="btn btn-accent" type="submit">
-        <svg class="ico sm"><use href="#i-check"/></svg>保存
+      <button class="btn btn-ghost" type="submit">
+        <svg class="ico sm"><use href="#i-check"/></svg>保存抓取设置
       </button>
     </div>
   </form>
-</section>
+</details>
 
 <!-- ==================== 关于 ==================== -->
 <section class="card set-card">
@@ -171,48 +337,67 @@
 (function () {
   'use strict';
 
-  /* 选服务商 → 预填 base_url 与模型名（不碰 Key） */
-  var preset = document.getElementById('chatPreset');
-  var base = document.getElementById('chatBase');
-  var model = document.getElementById('chatModel');
-  if (preset) {
-    preset.addEventListener('change', function () {
-      var o = preset.options[preset.selectedIndex];
-      var u = o.getAttribute('data-url') || '';
-      var m = o.getAttribute('data-model') || '';
-      if (u) base.value = u;
-      if (m) model.value = m;
-      base.focus();
+  /* 选服务商 → 自动填接口地址与一个常见模型名（都能改） */
+  var PRESETS = {
+    deepseek: { base: 'https://api.deepseek.com/v1', model: 'deepseek-chat' },
+    zhipu:    { base: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4-flash' },
+    moonshot: { base: 'https://api.moonshot.cn/v1', model: 'moonshot-v1-8k' },
+    openai:   { base: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
+    ollama:   { base: 'http://127.0.0.1:11434/v1', model: 'qwen2.5:7b' }
+  };
+  var prov = document.getElementById('mmProvider');
+  var baseIn = document.getElementById('mmBase');
+  var modelIn = document.getElementById('mmModel');
+  if (prov) {
+    prov.addEventListener('change', function () {
+      var p = PRESETS[prov.value];
+      if (!p) return;
+      if (baseIn && !baseIn.value) baseIn.value = p.base;
+      if (modelIn && !modelIn.value) modelIn.value = p.model;
     });
   }
 
-  /* 测试连接：只验证「地址通、Key 认、模型名存在」 */
-  var btn = document.getElementById('chatTest');
-  var out = document.getElementById('chatTestOut');
-  if (!btn) return;
-  btn.addEventListener('click', function () {
-    out.textContent = '测试中…';
-    out.className = 'test-out';
-    btn.disabled = true;
-    fetch('{{ url_for("api_chat_test") }}', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        base_url: base.value.trim(),
-        api_key: document.getElementById('chatKey').value.trim(),
-        model: model.value.trim()
-      })
-    }).then(function (r) { return r.json(); })
-      .then(function (d) {
-        out.textContent = d.message || (d.ok ? '连接正常' : '连接失败');
-        out.className = 'test-out ' + (d.ok ? 'ok' : 'bad');
-      })
-      .catch(function () {
-        out.textContent = '请求失败';
-        out.className = 'test-out bad';
-      })
-      .finally(function () { btn.disabled = false; });
-  });
+  /* 自建角色：让 AI 把一句话写成完整人设，填进表单 */
+  var genBtn = document.getElementById('cpGen');
+  var briefIn = document.getElementById('cpBrief');
+  var outEl = document.getElementById('cpOut');
+  if (genBtn && briefIn) {
+    genBtn.addEventListener('click', function () {
+      var brief = briefIn.value.trim();
+      if (!brief) { outEl.textContent = '先写一句你想要的角色'; outEl.className = 'test-out bad'; briefIn.focus(); return; }
+      outEl.textContent = '正在写人设…';
+      outEl.className = 'test-out';
+      genBtn.disabled = true;
+
+      fetch('{{ url_for("api_persona_generate") }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brief: brief })
+      }).then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (!d.ok) {
+            outEl.textContent = d.message || '生成失败';
+            outEl.className = 'test-out bad';
+            return;
+          }
+          var p = d.persona || {};
+          var set = function (id, v) { var el = document.getElementById(id); if (el && v) el.value = v; };
+          set('cpName', p.name);
+          set('cpJp', p.jp);
+          set('cpRole', p.role);
+          set('cpVoice', p.voice);
+          set('cpGreeting', p.greeting);
+          set('cpBriefHidden', brief);
+          outEl.textContent = '写好了，检查一下再点「加入角色」';
+          outEl.className = 'test-out ok';
+        })
+        .catch(function () {
+          outEl.textContent = '请求失败';
+          outEl.className = 'test-out bad';
+        })
+        .finally(function () { genBtn.disabled = false; });
+    });
+  }
 })();
 </script>
 {% endblock %}

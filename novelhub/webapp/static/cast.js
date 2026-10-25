@@ -349,5 +349,157 @@
     if (e.key === "Escape" && modal && modal.classList.contains("on")) closeModal();
   });
 
+  /* ---------------- 看板娘可拖动 ----------------
+   *
+   * 需求：那个圆圈能拖到任意位置，松手后记住，下次打开还在原地。
+   * 实现要点：
+   *   - 用 left/top 绝对定位（CSS 里默认 right/bottom，拖动时切过去）
+   *   - 指针事件统一走 pointerdown/move/up，鼠标和触摸一套代码
+   *   - 拖过之后要给「点击」加个闸，否则松手会误触发换台词
+   *   - 吸附到左右边缘（贴边 8px），并夹在视口内，别拖出屏幕
+   *   - 位置存 localStorage，窗口缩放时重新夹一遍
+   */
+  (function initMascotDrag() {
+    if (!mascot) return;
+    var face = $("#mascotFace") || mascot.querySelector(".mascot-face");
+    if (!face) return;
+
+    var POS_KEY = "nh-mascot-pos";
+    var EDGE = 8;              // 贴边留白
+    var dragging = false;
+    var moved = false;         // 这次按下有没有真的移动过
+    var startX = 0, startY = 0;
+    var originX = 0, originY = 0;
+    var raf = null;
+
+    function viewport() {
+      return { w: window.innerWidth, h: window.innerHeight };
+    }
+
+    function clamp(x, y) {
+      var vp = viewport();
+      var w = mascot.offsetWidth || 66;
+      var h = mascot.offsetHeight || 66;
+      var maxX = Math.max(EDGE, vp.w - w - EDGE);
+      var maxY = Math.max(EDGE, vp.h - h - EDGE);
+      return {
+        x: Math.min(Math.max(x, EDGE), maxX),
+        y: Math.min(Math.max(y, EDGE), maxY)
+      };
+    }
+
+    // 把 right/bottom 定位换算成 left/top，之后一律用 left/top
+    function toLeftTop() {
+      var r = mascot.getBoundingClientRect();
+      mascot.style.left = r.left + "px";
+      mascot.style.top = r.top + "px";
+      mascot.style.right = "auto";
+      mascot.style.bottom = "auto";
+      return { x: r.left, y: r.top };
+    }
+
+    function apply(x, y) {
+      var p = clamp(x, y);
+      mascot.style.left = p.x + "px";
+      mascot.style.top = p.y + "px";
+      mascot.style.right = "auto";
+      mascot.style.bottom = "auto";
+      return p;
+    }
+
+    function save(x, y) {
+      try { localStorage.setItem(POS_KEY, JSON.stringify({ x: x, y: y })); } catch (e) {}
+    }
+
+    function restore() {
+      var raw = null;
+      try { raw = localStorage.getItem(POS_KEY); } catch (e) {}
+      if (!raw) return false;
+      var p;
+      try { p = JSON.parse(raw); } catch (e) { return false; }
+      if (typeof p.x !== "number" || typeof p.y !== "number") return false;
+      var c = clamp(p.x, p.y);
+      mascot.style.left = c.x + "px";
+      mascot.style.top = c.y + "px";
+      mascot.style.right = "auto";
+      mascot.style.bottom = "auto";
+      return true;
+    }
+
+    function onDown(e) {
+      // 只处理主键 / 单指
+      if (e.button !== undefined && e.button !== 0) return;
+      var start = toLeftTop();
+      dragging = true;
+      moved = false;
+      startX = e.clientX;
+      startY = e.clientY;
+      originX = start.x;
+      originY = start.y;
+      mascot.classList.add("dragging");
+      try { face.setPointerCapture(e.pointerId); } catch (err) {}
+      e.preventDefault();
+    }
+
+    function onMove(e) {
+      if (!dragging) return;
+      var dx = e.clientX - startX;
+      var dy = e.clientY - startY;
+      if (!moved && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) moved = true;
+      if (!moved) return;
+      var x = originX + dx;
+      var y = originY + dy;
+      if (raf) cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(function () { apply(x, y); });
+    }
+
+    function onUp(e) {
+      if (!dragging) return;
+      dragging = false;
+      mascot.classList.remove("dragging");
+      try { face.releasePointerCapture(e.pointerId); } catch (err) {}
+      // 取消还在排队的 rAF，否则它会在吸附之后再把位置改回拖动中的值
+      if (raf) { cancelAnimationFrame(raf); raf = null; }
+      if (!moved) return;   // 没移动就当点击，交给原来的点击逻辑
+
+      // 注意：不能用 getBoundingClientRect() 读当前位置 —— apply() 走的是
+      // requestAnimationFrame，这里读到的可能还是拖动前的旧值。
+      // 直接用「起点 + 指针位移」算出落点，再吸附到更近的一侧。
+      var finalX = originX + (e.clientX - startX);
+      var finalY = originY + (e.clientY - startY);
+      var p0 = clamp(finalX, finalY);
+      var vp = viewport();
+      var w = mascot.offsetWidth || 66;
+      var snapX = (p0.x + w / 2) < vp.w / 2 ? EDGE : vp.w - w - EDGE;
+      var p = apply(snapX, p0.y);
+      save(p.x, p.y);
+    }
+
+    // 拖过之后，拦掉紧跟的一次 click，避免误触发「换句话」
+    function onClickCapture(e) {
+      if (moved) {
+        e.stopPropagation();
+        e.preventDefault();
+        moved = false;
+      }
+    }
+
+    face.addEventListener("pointerdown", onDown);
+    face.addEventListener("pointermove", onMove);
+    face.addEventListener("pointerup", onUp);
+    face.addEventListener("pointercancel", onUp);
+    face.addEventListener("click", onClickCapture, true);
+    // 拖动时不要选中文字 / 触发页面滚动
+    face.style.touchAction = "none";
+
+    window.addEventListener("resize", function () {
+      if (!localStorage) return;
+      var r = mascot.getBoundingClientRect();
+      apply(r.left, r.top);
+    });
+
+    restore();
+  })();
+
   paintChrome();
 })();

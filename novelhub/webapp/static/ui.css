@@ -34,6 +34,10 @@
 
   --rail: 244px;
   --appbar: 68px;
+  /* 页面内容宽度：大屏下由文件末尾的 min-width 媒体查询逐级放大 */
+  --page-max: 1240px;
+  /* 书架网格最小列宽：跟着 --page-max 一起放大，避免大屏卡片过小 */
+  --book-min: 176px;
   --radius-sm: 8px;
   --radius: 12px;
   --radius-lg: 18px;
@@ -259,7 +263,7 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 }
 .appbar-in {
   height: 100%;
-  max-width: 1240px;
+  max-width: var(--page-max);
   margin: 0 auto;
   padding: 0 34px;
   display: flex;
@@ -347,7 +351,7 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 
 .main {
   width: 100%;
-  max-width: 1240px;
+  max-width: var(--page-max);
   margin: 0 auto;
   padding: 26px 34px 72px;
   flex: 1;
@@ -579,7 +583,7 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 
 .books {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(176px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(var(--book-min), 1fr));
   gap: 30px 24px;
 }
 .books.compact { grid-template-columns: repeat(auto-fill, minmax(142px, 1fr)); gap: 24px 18px; }
@@ -1404,6 +1408,35 @@ body.prose-sans .chapter-body, body.prose-sans .prose { font-family: var(--font-
   .sheet-themes { display: flex; gap: 8px; margin-top: 12px; }
   .sheet-themes button { flex: 1; height: 38px; border-radius: 9px; border: 1px solid var(--line); background: var(--bg); font-size: 11px; }
   .sheet-themes button.on { border-color: var(--accent); color: var(--accent); }
+}
+
+/* ---------- 大屏适配：内容随视口放大，而不是永远卡在 1240px ---------- */
+/* 1440 及以下保持原样；1600 起逐级放宽内容宽度并放大书架卡片，
+   否则 2K/4K 上会出现「内容缩在左边一条、右侧大片空白、字和卡片都过小」。 */
+@media (min-width: 1600px) {
+  :root { --page-max: 1440px; --book-min: 196px; }
+  .main { padding: 30px 40px 80px; }
+  .appbar-in { padding: 0 40px; }
+  .books { gap: 34px 26px; }
+}
+
+@media (min-width: 1920px) {
+  :root { --page-max: 1680px; --book-min: 214px; }
+  body { font-size: 14.5px; }
+  .main { padding: 34px 48px 88px; }
+  .appbar-in { padding: 0 48px; }
+}
+
+@media (min-width: 2300px) {
+  :root { --page-max: 1920px; --book-min: 236px; }
+  body { font-size: 15px; }
+  .main { padding: 38px 56px 96px; }
+  .appbar-in { padding: 0 56px; }
+}
+
+/* 阅读页不受 --page-max 影响（正文用 --measure 控制宽度），这里明确兜住 */
+@media (min-width: 1600px) {
+  body.reading .main { max-width: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

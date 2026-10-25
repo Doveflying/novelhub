@@ -75,12 +75,13 @@
         </div>
         {% if not ready %}
         <div class="im-setup">
-          <p class="im-warn">还没配模型 API。这个功能不带任何内置密钥，需要你自己填一份。</p>
+          <span class="im-badge">模型未接通</span>
           <p class="im-warn-sub">
-            支持任何 OpenAI 兼容接口：DeepSeek / 智谱 / Kimi / OpenAI / Ollama 本地模型都行。
+            接一个模型就能开始聊。DeepSeek、智谱、Kimi、OpenAI、本机 Ollama 都支持，
+            填个 API Key 再给角色挑个模型就行。
           </p>
           <a class="btn btn-accent btn-sm" href="{{ url_for('settings_page') }}#chat-model">
-            <svg class="ico sm"><use href="#i-settings"/></svg>去配置模型
+            <svg class="ico sm"><use href="#i-settings"/></svg>去接模型
           </a>
         </div>
         {% endif %}
@@ -89,7 +90,7 @@
 
     <form class="im-compose" id="imForm" autocomplete="off">
       <textarea id="imInput" rows="1" maxlength="4000" enterkeyhint="send"
-                placeholder="{{ ('和' ~ persona.name ~ '说点什么…') if ready else '先去设置里填模型 API' }}"
+                placeholder="{{ ('和' ~ persona.name ~ '说点什么…') if ready else '模型接通后就能聊' }}"
                 aria-label="输入消息"></textarea>
       <button class="im-send" id="imSend" type="submit" disabled aria-label="发送">
         <svg class="i-send" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V6"/><path d="M6.4 11.4L12 5.8l5.6 5.6"/></svg>

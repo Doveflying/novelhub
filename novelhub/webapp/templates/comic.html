@@ -1,9 +1,13 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 {% block title %}漫画阅读{% endblock %}
 {% block bodyclass %}comic-reading{% endblock %}
 {% block mainclass %}comic-main{% endblock %}
 {% block content %}
 <div class="reader-toolbar">
+  <a class="icon-btn" id="comicBack" href="{{ url_for('comic_detail', key=key, comic_id=comic_id) }}"
+     title="返回" aria-label="返回">
+    <svg class="ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>
+  </a>
   <a class="icon-btn" href="{{ url_for('comic_detail', key=key, comic_id=comic_id) }}" title="章节">☰</a>
   <div class="reader-title">
     <span class="rt-book" id="comicTitle">{{ key }} · {{ comic_id }}</span>
@@ -23,6 +27,19 @@
     <div class="sk-block"></div>
   </div>
   <div class="comic-pages" id="comicPages"></div>
+
+<!-- 看完这一话的直接出口：滑到底就能翻话，不用再滑回顶部 -->
+<nav class="comic-end" id="comicEnd">
+  <a class="btn btn-ghost" id="prevEp2" href="#" hidden>
+    <svg class="ico sm"><use href="#i-arrow-l"/></svg>上一话
+  </a>
+  <a class="btn btn-ghost" href="{{ url_for('comic_detail', key=key, comic_id=comic_id) }}">
+    回章节
+  </a>
+  <a class="btn btn-accent" id="nextEp2" href="#" hidden>
+    下一话<svg class="ico sm"><use href="#i-arrow-r"/></svg>
+  </a>
+</nav>
 </div>
 {% endblock %}
 

@@ -39,10 +39,16 @@ _show_rank.py
 _cdp_measure.py
 _probe_tab.py
 *.log
+# 根目录的一次性调试脚本（Node 侧探针：桥接测试、DOM 比对、编码验证等）
+/_*.cjs
+/_*.mjs
+/_*.js
 
 # ============ 打包产物（用 novelhub.spec 现场生成，不进仓库） ============
 /build/
 /dist/
+/dist_new/
+/dist_*/
 *.spec.bak
 build/icons/
 

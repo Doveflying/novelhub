@@ -374,6 +374,61 @@ python nh.py js info  ManHuaGui 51517                 # 详情 + 章节
 python nh.py js ep    zaimanhua 72283 146548          # 下载一话 + 生成预览页
 ```
 
+### 手机上怎么跑（APK 里没有 node）
+
+`refs/venera/sources/*.js` 有 39 个，但 `.gitignore` 只影响提交，`sync_sources.py`
+照样把它们打进 APK（`assets/chaquopy/app.imy` 里能数出 39 个）。
+
+真正的问题从来不是源文件，而是**执行器**：`venera_js.py` 原来只有一条路——
+`subprocess.run(["node", ...])`。APK 的 `lib/` 里只有
+`libpython3.11 / libssl / libcrypto / libsqlite3`，没有 node，Android 上也装不进来：
+
+| 尝试 | 结果 |
+|---|---|
+| Chaquopy 装 quickjs / dukpy / mini-racer / js2py / pythonmonkey | `chaquo.com/pypi-13.1` 索引 138 个包里一个都没有，全 404 |
+| 塞 node 二进制进 jniLibs | node 官方无 Android 构建；Termux 那份 rpath 绑死 prefix |
+| js2py 纯 Python 解释 | 源用了 ES6 class + async/await + `?.`（285 处）+ `??`（75 处），跑不了 |
+| **WebView 当 JS 引擎** | Android 自带完整 V8，`DOMParser` 现成（源里 184 处用 `document` 全局），零新增体积 |
+
+所以 Android 走 WebView：
+
+```
+Flask 线程 → JsBridge.eval()                       [Java，阻塞等 latch]
+    → 隐藏 WebView 里 __veneraRun()
+        → sendMessage() → bridge.host(json)        [@JavascriptInterface，同步]
+            → bookfly/jshost.py 的 handle()         [HTTP/加密/存储]
+        → bridge.done() 释放 Flask 线程
+```
+
+三块代码各管一段：
+
+| 文件 | 职责 |
+|---|---|
+| `android/app/src/main/assets/jshost/bridge.js` | `init.js` 的等价实现：`Convert.*` / `Network.*` / `HtmlDocument` / `ComicSource` / `UI` / `APP` |
+| `bookfly/jshost.py` | 能力后端：HTTP 走 `novelhub.net.Fetcher`（与桌面同一条代理/重试/缓存链路），加密走 hashlib + cryptography |
+| `android/.../JsBridge.java` | 隐藏 WebView + 同步桥 + 每次调用的 latch |
+
+`venera_js.py` 按平台自动选路：`_IS_ANDROID` 为真且 `java` 模块可导入时走 WebView，
+否则走 node。两条路返回同样的 `{"ok": bool, "data"|"error"}`，上层无感。
+
+**实测等价性**（同一关键词，同一批源，Node runner vs WebView bridge）：
+
+```
+zaimanhua   node=ok(20)  bridge=ok(20)  SAME
+hot_manga   node=ok(20)  bridge=ok(20)  SAME
+ikmmh       node=ok(16)  bridge=ok(16)  SAME
+manhuaren   node=ok(22)  bridge=ok(22)  SAME
+dm5         node=ok(22)  bridge=ok(22)  SAME
+```
+
+**顺带修掉一个桌面端也存在的真 bug**：源会在 headers 里写死
+`accept-encoding: gzip, deflate, br, zstd`。requests 一旦看到调用方显式指定，
+就**不再自动解压**，而 PyPI 上没有 brotli 时 `br` 根本解不开——`manhuaren`
+实测拿到 7160 字节压缩乱码，`JSON.parse` 直接崩。修法是把
+`accept-encoding` / `host` / `content-length` / `connection` 这类交给
+requests 自己管的头丢掉，让它走自己的协商与解压链路。
+
+
 ### 照着反编译出来的 APK 对齐了执行器
 
 `Venera-RE/` 里有 `com.github.wgh136.venera` v1.6.1 的逆向产物。真正有用的是它

@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
@@ -38,6 +40,65 @@ def _source_file(name: str) -> Path | None:
         if p.exists() and p.stat().st_size > 500:
             return p
     return None
+
+
+# ------------------------------------------------------------------ 执行器选择
+# Android 上没有 node，也装不进来（Chaquopy 的索引里没有任何 JS 引擎），
+# 改用系统 WebView 的 V8：Java 侧 JsBridge 起一个隐藏 WebView，
+# bookfly/jshost.py 提供 HTTP/加密/存储能力。
+_IS_ANDROID = sys.platform == "android" or "ANDROID_DATA" in os.environ
+
+
+def _android_runner():
+    """返回 Android 执行器；不在 Android 或桥不可用时返回 None。"""
+    if not _IS_ANDROID:
+        return None
+    try:
+        import java  # noqa: F401  type: ignore[import-not-found]
+    except Exception:  # noqa: BLE001
+        return None
+    return _run_on_webview
+
+
+def _run_on_webview(src: "JsSource", action: str, params: dict, timeout: int) -> Any:
+    """用 WebView 的 V8 跑一个源动作。
+
+    流程：
+      1. 在 Python 侧登记 job 上下文（Fetcher / 键值存储路径）
+      2. 调 Java JsBridge.eval()，它会阻塞直到 JS 把结果交回来
+      3. JS 期间所有 Network.* / Convert.* 都同步回调到 bookfly.jshost.handle
+    """
+    from java import jclass  # type: ignore[import-not-found]
+
+    from bookfly import jshost  # type: ignore[import-not-found]
+
+    Bridge = jclass("com.firefly.library.JsBridge")
+    bridge = Bridge.get(_android_context())
+
+    job_id = f"job-{src.path.stem}-{time.time_ns()}"
+    jshost.begin_job(job_id, store_path=str(src.store), cfg=src.cfg)
+    try:
+        raw = bridge.eval(
+            job_id,
+            src.path.read_text(encoding="utf-8", errors="replace"),
+            action,
+            json.dumps(params or {}, ensure_ascii=False),
+            int(timeout * 1000),
+        )
+    finally:
+        jshost.end_job(job_id)
+
+    data = json.loads(str(raw))
+    if not data.get("ok"):
+        raise RuntimeError(str(data.get("error"))[:300])
+    return data.get("data")
+
+
+def _android_context():
+    """拿 Application 当 Context：不需要 Activity，生命周期也够长。"""
+    from java import jclass  # type: ignore[import-not-found]
+
+    return jclass("android.app.ActivityThread").currentApplication()
 
 
 @dataclass
@@ -158,6 +219,17 @@ class JsSource:
 
     # ---------------- 调用 ----------------
     def call(self, action: str, params: Optional[dict] = None, timeout: int = 120) -> Any:
+        """跑一个源动作。执行器按平台自动选择：
+
+        - Android：WebView 的 V8（APK 里没有 node，也没法塞进去）
+        - 桌面：node 子进程跑 runner.mjs
+
+        两条路返回同样的 ``{"ok": bool, "data"|"error"}``，上层不用关心。
+        """
+        runner = _android_runner() if _IS_ANDROID else None
+        if runner is not None:
+            return runner(self, action, params or {}, timeout)
+
         from ..config import detect_proxies
 
         candidates = [self.proxy] if self.proxy else []
@@ -173,14 +245,23 @@ class JsSource:
                 "proxy": proxy,
                 "store": str(self.store),
             }
-            proc = subprocess.run(
-                ["node", str(RUNNER), json.dumps(payload, ensure_ascii=False)],
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                timeout=timeout,
-            )
+            try:
+                proc = subprocess.run(
+                    ["node", str(RUNNER), json.dumps(payload, ensure_ascii=False)],
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    timeout=timeout,
+                    # Windows 上必须加这个：不加的话每跑一次 JS 源（搜漫画/取详情）
+                    # 都会弹出一个 node 控制台黑框，搜索时一直闪。
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                )
+            except FileNotFoundError as exc:
+                raise RuntimeError(
+                    "找不到 node。桌面端请装 Node.js 18+；"
+                    "Android 端应由 WebView 引擎接管，走到这里说明桥没起来。"
+                ) from exc
             if proc.returncode == 0:
                 try:
                     data = json.loads(proc.stdout)

@@ -174,6 +174,8 @@
           }
           var msg = '小说 ' + rows.length + ' 条';
           if (!rows.length) msg = '小说没命中';
+          // 慢源不算失败：先给已经拿到的结果，说明还有谁在搜
+          if (d.slow && d.slow.length) msg += '（' + d.slow.length + ' 个源较慢，已跳过）';
           if (d.errors && d.errors.length) msg += '（失败 ' + d.errors.length + '）';
           settle(msg);
         })

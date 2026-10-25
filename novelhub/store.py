@@ -795,8 +795,11 @@ class Library:
         if source:
             sql += " AND source=?"
             params.append(source)
-        sql += " ORDER BY length(title) ASC LIMIT ?"
-        params.append(max(limit * 6, 60))
+        # 不要按标题长度排序取候选：搜「文库」这种常见词时，短标题会先把
+        # 候选池占满（实测 5412 本里捞出来的全是 1~2 字的），长标题根本没机会
+        # 进打分。先取足够的候选（多取一些），再在 Python 里按相关度排。
+        sql += " LIMIT ?"
+        params.append(max(limit * 20, 300))
         rows = [dict(r) for r in c.execute(sql, params).fetchall()]
 
         qq = q.strip().lower()
@@ -806,7 +809,9 @@ class Library:
             exact = 0 if t == qq else 1
             prefix = 0 if t.startswith(qq) else 1
             contains = 0 if qq and qq in t else 1
-            return (exact, prefix, contains, len(r["title"] or ""))
+            # 同等相关度下，标题更短的更可能是「正主」；但相关度优先，
+            # 长度只做最后的 tie-break。
+            return (contains, exact, prefix, len(r["title"] or ""))
 
         rows.sort(key=score)
         return rows[:limit]

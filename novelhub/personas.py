@@ -31,14 +31,26 @@ RULES = """【身份与规矩】
 #
 # 工具实现在 chat.py；这里只声明每个角色手上分到哪几把。
 
-T_SHELF = ["shelf_overview", "search_shelf", "reading_status", "search_online", "add_to_shelf"]
-T_ANIME = ["anime_status", "search_online"]
-T_COMIC = ["comic_status", "search_online"]
-T_READING = ["reading_status", "search_shelf", "history_digest"]
-T_SOURCE = ["source_health", "search_online", "add_to_shelf", "shelf_overview"]
+# 动作型工具：能真的把事办掉，不只是查数据
+T_ACT_READ = ["open_book", "remember_reading_spot", "fetch_book_text"]
+T_ACT_INDEX = ["build_novel_index"]
+T_ACT_IMPORT = ["import_local_file"]
+
+T_SHELF = ["shelf_overview", "search_shelf", "reading_status", "search_online",
+           "add_to_shelf", *T_ACT_READ]
+T_ANIME = ["anime_status", "search_online", "add_anime"]
+T_COMIC = ["comic_status", "search_online", "add_comic"]
+T_READING = ["reading_status", "search_shelf", "history_digest", *T_ACT_READ]
+T_SOURCE = ["source_health", "search_online", "add_to_shelf", "shelf_overview",
+            *T_ACT_INDEX, *T_ACT_IMPORT, "fetch_book_text"]
 T_ARCHIVE = ["history_digest", "shelf_overview", "reading_status"]
 T_ALL = ["shelf_overview", "search_shelf", "reading_status", "comic_status",
-         "anime_status", "source_health", "history_digest", "search_online", "add_to_shelf"]
+         "anime_status", "source_health", "history_digest", "search_online",
+         "add_to_shelf",
+         # 动作型：大管家（含用户自建角色）什么都能办
+         "fetch_book_text", "open_book", "build_novel_index",
+         "import_local_file", "remember_reading_spot",
+         "add_anime", "add_comic"]
 
 
 # ---------------------------------------------------------------- 小工具
@@ -493,16 +505,95 @@ CHIPS: dict[str, list[str]] = {
 }
 
 
-def get(who: str | None) -> Persona:
-    return PERSONAS.get((who or "").strip() or DEFAULT_WHO, PERSONAS[DEFAULT_WHO])
+BOSS_TEMPLATE = PERSONAS["miyagi"]
+
+
+def custom_list(cfg) -> list[dict]:
+    """用户自己加的角色（可以有很多个）。
+
+    存在 ``chat.custom_personas`` 里，是一个列表；老的单数键
+    ``chat.custom_persona`` 也认，自动当成只有一条。
+    """
+    chat = getattr(cfg, "chat", None) if cfg is not None else None
+    if not isinstance(chat, dict):
+        return []
+    items = chat.get("custom_personas")
+    out: list[dict] = []
+    if isinstance(items, list):
+        out = [c for c in items if isinstance(c, dict) and str(c.get("name") or "").strip()]
+    if not out:
+        one = chat.get("custom_persona")
+        if isinstance(one, dict) and str(one.get("name") or "").strip():
+            out = [one]
+    return out
+
+
+def _to_persona(custom: dict) -> Persona:
+    """把一条自定义人设变成 Persona。
+
+    **能力沿用大管家**：tools=T_ALL、facts=facts_miyagi、kind='main'。
+    用户换的只是名字、称呼、语气、开场白 —— 六位管家的活它都能接。
+    """
+    from dataclasses import replace
+
+    cid = str(custom.get("id") or "").strip() or ("c_" + str(custom.get("name") or "boss"))
+    name = str(custom.get("name") or "").strip() or "大管家"
+    return replace(
+        BOSS_TEMPLATE,
+        id=cid,
+        name=name,
+        jp=str(custom.get("jp") or "").strip() or "マイ・ボス",
+        role=str(custom.get("role") or "").strip() or "大管家",
+        voice=str(custom.get("voice") or "").strip() or BOSS_TEMPLATE.voice,
+        greet=(lambda lib, cfg, _t=str(custom.get("greeting") or "").strip(): _t)
+        if str(custom.get("greeting") or "").strip() else BOSS_TEMPLATE.greet,
+        kind="main",
+        tools=list(BOSS_TEMPLATE.tools),
+        facts=BOSS_TEMPLATE.facts,
+    )
+
+
+def custom_personas(cfg) -> list[Persona]:
+    return [_to_persona(c) for c in custom_list(cfg)]
+
+
+def all_personas(cfg=None) -> list[Persona]:
+    """全部角色：自建角色在前（都是大管家位），后面跟六个内置的。
+
+    内置的宫城志绪理在用户加了自建角色后仍然保留 —— 想用回默认的也行。
+    """
+    custom = custom_personas(cfg)
+    builtin = [PERSONAS[pid] for pid in ORDER if pid in PERSONAS]
+    return custom + builtin
+
+
+def get(who: str | None, cfg=None) -> Persona:
+    key = (who or "").strip() or DEFAULT_WHO
+    if key in PERSONAS:
+        return PERSONAS[key]
+    for p in custom_personas(cfg):
+        if p.id == key:
+            return p
+    return PERSONAS[DEFAULT_WHO]
+
+
+def list_all(cfg=None) -> list[Persona]:
+    """按「自建 + 内置」顺序返回全部角色对象。"""
+    return all_personas(cfg)
+
+
+def chips(who: str | None) -> list[str]:
+    return CHIPS.get((who or "").strip() or DEFAULT_WHO, CHIPS[DEFAULT_WHO])
 
 
 def roster(lib, cfg, ready_map: dict[str, bool] | None = None) -> list[dict]:
-    """给前端的联系人列表：谁、干什么、现在什么状态、模型通没通。"""
+    """给前端的联系人列表：谁、干什么、现在什么状态、模型通没通。
+
+    自建角色（可以有很多个）排在最前面，后面是六个内置的。
+    """
     ready_map = ready_map or {}
     out = []
-    for pid in ORDER:
-        p = PERSONAS[pid]
+    for p in all_personas(cfg):
         try:
             status = p.greet(lib, cfg)
         except Exception:  # noqa: BLE001

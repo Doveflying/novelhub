@@ -189,9 +189,285 @@ select.input { cursor: pointer; }
   color: var(--muted);
 }
 
+/* ---------- Key 行 ---------- */
+.key-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 200px;
+  gap: 14px;
+  align-items: start;
+}
+.key-field { min-width: 0; }
+.prov-field { min-width: 0; }
+.key-hint { margin: 10px 0 0; }
+.key-hint code {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--surface-2);
+}
+
+/* ---------- 高级折叠 ---------- */
+.adv { margin-top: 14px; }
+.adv > summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--muted);
+  padding: 6px 0;
+  list-style: none;
+}
+.adv > summary::-webkit-details-marker { display: none; }
+.adv > summary::before {
+  content: "＋";
+  display: inline-block;
+  width: 14px;
+  color: var(--muted);
+}
+.adv[open] > summary::before { content: "－"; }
+.adv > summary:hover { color: var(--accent); }
+.adv .field { margin-top: 8px; }
+
+/* ---------- 已接入的模型列表 ---------- */
+.set-count {
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 7px;
+  margin-left: 6px;
+  border-radius: 999px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  vertical-align: middle;
+}
+
+.mm-list {
+  list-style: none;
+  margin: 0 0 4px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mm-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--surface);
+  transition: border-color .14s, background .14s;
+}
+.mm-item:hover { border-color: var(--line-strong); background: var(--surface-2); }
+.mm-dot {
+  flex: none;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.mm-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+.mm-label {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mm-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.mm-meta code {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--surface-2);
+  color: var(--ink-2);
+}
+.mm-url {
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mm-sep { opacity: .5; }
+.mm-key { color: var(--muted); }
+.mm-del { flex: none; margin: 0; }
+.mm-delbtn { width: 32px; height: 32px; color: var(--muted); }
+.mm-delbtn:hover { color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, transparent); }
+
+.mm-empty {
+  margin: 0 0 12px;
+  padding: 18px 16px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 11px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--muted);
+  background: var(--surface-2);
+}
+
+.mm-add { margin-top: 14px; }
+.mm-addform { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+
+/* ---------- 自建角色 ---------- */
+.cp-list { margin-bottom: 4px; }
+.cp-face img {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid color-mix(in srgb, var(--accent) 40%, transparent);
+}
+.cp-jp {
+  font-style: normal;
+  font-size: 10.5px;
+  color: var(--muted);
+  letter-spacing: .04em;
+  margin-left: 5px;
+}
+.cp-cap {
+  font-size: 10.5px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.cp-add { margin-top: 14px; }
+.cp-gen {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.cp-genbtn { min-height: 40px; white-space: nowrap; }
+.cp-form { margin-top: 6px; }
+.cp-voice {
+  resize: vertical;
+  min-height: 88px;
+  line-height: 1.6;
+  font-family: inherit;
+}
+#cpOut:empty { display: none; }
+#cpOut { margin: 8px 0 0; }
+
+/* 角色行上的标签 */
+.pm-tag {
+  font-size: 9.5px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 999px;
+  letter-spacing: .02em;
+  color: var(--muted);
+  background: var(--surface-2);
+  vertical-align: middle;
+}
+.pm-tag-custom {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* ---------- 角色 → 模型 ---------- */
+.pm-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pm-row {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) 220px;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 10px;
+  border-radius: 11px;
+  transition: background .14s;
+}
+.pm-row:hover { background: var(--surface-2); }
+.pm-face img {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid color-mix(in srgb, var(--who, var(--accent)) 45%, transparent);
+  background: var(--surface-2);
+}
+.pm-who { display: flex; flex-direction: column; min-width: 0; }
+.pm-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+  display: flex; align-items: baseline; gap: 6px;
+}
+.pm-name em {
+  font-style: normal;
+  font-size: 10.5px;
+  color: var(--muted);
+  letter-spacing: .04em;
+}
+.pm-role { font-size: 11.5px; color: var(--muted); }
+.pm-pick { min-width: 0; }
+.pm-pick .input {
+  padding: 7px 10px;
+  font-size: 12.5px;
+  border-radius: 8px;
+}
+
+/* ---------- 保存条 ---------- */
+.set-actions-sticky {
+  position: sticky;
+  bottom: 14px;
+  z-index: 5;
+  margin: 6px 0 18px;
+  padding: 12px 14px;
+  border-radius: 13px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-md);
+}
+
+/* ---------- 抓取设置折叠卡 ---------- */
+.set-adv-card { padding: 0; overflow: hidden; }
+.set-adv-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 22px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--ink-2);
+  list-style: none;
+}
+.set-adv-summary::-webkit-details-marker { display: none; }
+.set-adv-summary:hover { color: var(--accent); }
+.set-adv-card[open] .set-adv-summary {
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+}
+.set-adv-body { padding: 20px 22px 22px; }
+
+/* ---------- 窄屏 ---------- */
+@media (max-width: 720px) {
+  .key-row { grid-template-columns: 1fr; }
+  .pm-row { grid-template-columns: 40px minmax(0, 1fr); gap: 10px; }
+  .pm-pick { grid-column: 1 / -1; }
+  .set-actions-sticky { position: static; }
+}
+
 /* ---------- 窄屏 ---------- */
 @media (max-width: 640px) {
   .set-card { padding: 18px 16px; }
+  .set-adv-card { padding: 0; }
+  .set-adv-summary { padding: 14px 16px; }
+  .set-adv-body { padding: 16px; }
   .set-head { flex-wrap: wrap; gap: 10px; }
   .set-state { margin-left: 0; }
   .field-row { grid-template-columns: 1fr; }

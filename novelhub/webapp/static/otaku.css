@@ -984,6 +984,19 @@ body.reading { background: var(--bg); }
 }
 .mascot-face:hover { animation-play-state: paused; }
 .mascot-face:active { transform: scale(.94); }
+
+/* 可拖动：拖动时停掉浮动动画、提层级、给抓取光标 */
+.mascot-face { cursor: grab; touch-action: none; }
+.mascot.dragging { z-index: 90; }
+.mascot.dragging .mascot-face {
+  animation: none;
+  cursor: grabbing;
+  transform: scale(1.04);
+  box-shadow: 0 20px 40px -16px color-mix(in srgb, var(--accent) 90%, transparent);
+}
+.mascot.dragging .mascot-bubble { opacity: 0; pointer-events: none; }
+/* 拖动过程中别让文字被选中 */
+.mascot.dragging, .mascot.dragging * { user-select: none; -webkit-user-select: none; }
 .mf-badge {
   position: absolute;
   right: -2px; bottom: 0;
@@ -1515,3 +1528,48 @@ body.reading .mascot-face { width: 54px; height: 54px; flex-basis: 54px; }
    不要把移动端覆盖写回这里 —— 各页面级 CSS（如 chat.css）在本文件之后加载，
    同优先级会盖掉这里的规则。 */
 
+/* ---------- 看板娘：移动端默认位置 ----------
+ * 手机上 bottom:22px 会被底部 tabbar（58px）盖住，贴右边又会压到正文末尾。
+ * 抬到 tabbar 之上、离右边留一点，用户还能自己拖走（位置会记住）。
+ */
+@media (max-width: 760px) {
+  .mascot {
+    right: 12px;
+    bottom: calc(58px + 14px + env(safe-area-inset-bottom, 0px));
+  }
+  .mascot-face { width: 56px; height: 56px; flex-basis: 56px; }
+  .mascot-bubble { width: 200px; font-size: 12px; }
+  .mascot.dragging .mascot-face { transform: scale(1.08); }
+}
+
+/* ---------- 顶部返回键 ---------- */
+/* 每页都能退回上一页；没有历史时由 JS 把 hidden 打开，别留死按钮 */
+.appbar-in .backbtn {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  margin-right: -4px;
+  color: var(--ink-2);
+}
+.appbar-in .backbtn:hover { color: var(--ink); background: var(--surface-2); }
+.appbar-in .backbtn[hidden] { display: none; }
+
+/* ---------- 漫画：看完这一话的出口 ---------- */
+/* 之前翻话只能滑回顶栏，看到最后一张图还得往回滚一遍，很反人类 */
+.comic-end {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 14px;
+  padding: 26px 16px 44px;
+  border-top: 1px dashed var(--line-strong);
+}
+.comic-end .btn { min-width: 118px; }
+.comic-end .btn[hidden] { display: none; }
+
+@media (max-width: 760px) {
+  .appbar-in .backbtn { width: 34px; height: 34px; }
+  .comic-end { gap: 8px; padding: 22px 12px 36px; }
+  .comic-end .btn { flex: 1; min-width: 0; }
+}

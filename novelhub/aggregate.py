@@ -275,6 +275,7 @@ def aggregate(
     comics: list[dict] = []
     animes: list[dict] = []
     errors: list[str] = []
+    slow_sources: list[str] = []  # 没等、但也没失败的源
 
     jobs: list[tuple[str, str]] = []
     # --- 小说源 ---
@@ -336,25 +337,63 @@ def aggregate(
         futures[fut] = (kind, key)
 
     try:
-        for fut in as_completed(futures, timeout=timeout):
-            kind, name = futures[fut]
-            try:
-                rows = fut.result() or []
-            except Exception as exc:  # noqa: BLE001
-                errors.append(f"{name}: {str(exc)[:80]}")
+        # 关键：不能死等到 timeout 才返回。
+        #
+        # 实测各源耗时差得很远（linovelib 0.1s、local 0.02s、linovel 3.5s、
+        # bangumi 1.5~15s 抖动）。原来 as_completed(timeout=...) 会一直阻塞到
+        # 总超时：用户明明 0.1 秒就拿到了索引结果，还要干等十几秒，最后收到一个
+        # 「超时」——体感就是「搜索一直转圈然后失败」。
+        #
+        # 改成：一旦有源返回，再给剩下的源一个宽限期（GRACE 秒），到点就收工，
+        # 把已经拿到的结果还回去，errors 里只说明「谁还在搜」。
+        import time as _time
+        from concurrent.futures import FIRST_COMPLETED
+        from concurrent.futures import wait as _wait
+
+        # 宽限期要能覆盖住「实时源」的正常耗时：实测 linovel 3.5s 左右，
+        # 给 6s 刚刚好——它来得及，bangumi（8~15s 抖动）会被切掉。
+        GRACE = 6.0
+        deadline = _time.monotonic() + max(1.0, timeout)
+        pending = set(futures)
+        grace_until = None
+
+        while pending:
+            now = _time.monotonic()
+            remain = deadline - now
+            if grace_until is not None:
+                remain = min(remain, grace_until - now)
+            if remain <= 0:
+                slow = [futures[f][1] for f in pending]
+                if grace_until is not None:
+                    # 这不是失败，只是没等它 —— 单独记，前端按「还在搜」展示
+                    slow_sources.extend(slow)
+                else:
+                    errors.append("超时：" + ",".join(slow[:4]))
+                break
+
+            done, pending = _wait(pending, timeout=remain, return_when=FIRST_COMPLETED)
+            if not done:
                 continue
-            if kind == "novel":
-                novels.extend(rows)
-            elif kind == "anime":
-                animes.extend(rows)
-            else:
-                for r in rows:
-                    r["source_name"] = names.get(name, name)
-                comics.extend(rows)
-    except TimeoutError:
-        done = {id(f) for f in futures if f.done()}
-        slow = [futures[f][1] for f in futures if id(f) not in done]
-        errors.append("超时：" + ",".join(slow[:6]))
+
+            for fut in done:
+                kind, name = futures[fut]
+                try:
+                    rows = fut.result() or []
+                except Exception as exc:  # noqa: BLE001
+                    errors.append(f"{name}: {str(exc)[:80]}")
+                    continue
+                if kind == "novel":
+                    novels.extend(rows)
+                elif kind == "anime":
+                    animes.extend(rows)
+                else:
+                    for r in rows:
+                        r["source_name"] = names.get(name, name)
+                    comics.extend(rows)
+
+            # 第一批结果到手，开始计宽限
+            if grace_until is None:
+                grace_until = _time.monotonic() + GRACE
     finally:
         # 不等慢源：取消未开始的，运行中的丢给后台
         ex.shutdown(wait=False, cancel_futures=True)
@@ -376,4 +415,6 @@ def aggregate(
         "animes": dedupe(animes),
         "comics": dedupe(comics),
         "errors": errors,
+        # 这些源没失败，只是慢到没等它 —— 前端提示「较慢已跳过」，不算失败
+        "slow": slow_sources,
     }

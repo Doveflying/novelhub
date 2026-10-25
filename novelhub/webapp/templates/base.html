@@ -150,6 +150,10 @@
   <div class="shell">
     <header class="appbar">
       <div class="appbar-in">
+        <button class="iconbtn backbtn" id="backBtn" type="button"
+                aria-label="返回上一页" title="返回上一页">
+          <svg class="ico"><use href="#i-arrow-l"/></svg>
+        </button>
         <a class="brand-mini" href="{{ url_for('index') }}" aria-label="书萤"><img src="{{ url_for('static', filename='brand/mark.svg') }}" alt="" width="20" height="20"></a>
         <div class="crumb">书萤 <span class="sep">/</span> <b>{% block crumb %}书架{% endblock %}</b></div>
 
@@ -169,6 +173,10 @@
           <button class="iconbtn" id="refreshBtn" type="button" aria-label="刷新这一页" title="刷新这一页">
             <svg class="ico"><use href="#i-refresh"/></svg>
           </button>
+          <a class="iconbtn {{ 'on' if cur_ep == 'settings_page' }}" href="{{ url_for('settings_page') }}"
+             id="settingsBtn" aria-label="设置" title="设置">
+            <svg class="ico"><use href="#i-settings"/></svg>
+          </a>
         </div>
       </div>
     </header>
@@ -218,6 +226,7 @@
     <a class="sheet-item" href="{{ url_for('crawl_page') }}"><svg class="ico"><use href="#i-download"/></svg>抓取</a>
     <a class="sheet-item" href="{{ url_for('import_page') }}"><svg class="ico"><use href="#i-upload"/></svg>导入</a>
     <a class="sheet-item" href="{{ url_for('sources_page') }}"><svg class="ico"><use href="#i-server"/></svg>书源</a>
+    <a class="sheet-item" href="{{ url_for('settings_page') }}"><svg class="ico"><use href="#i-settings"/></svg>设置</a>
     <button class="sheet-item" type="button" data-cast-open><svg class="ico"><use href="#i-cast"/></svg>角色</button>
   </div>
   <div class="sheet-themes">
@@ -337,6 +346,29 @@
 <script src="{{ url_for('static', filename='refresh.js') }}{{ '?v=' ~ asset_v }}"></script>
 <script src="{{ url_for('static', filename='cast.js') }}{{ '?v=' ~ asset_v }}"></script>
 <script src="{{ url_for('static', filename='pwa.js') }}{{ '?v=' ~ asset_v }}"></script>
+<script>
+  // 返回键：没历史可退时自动隐藏，别留一个点了没反应的按钮
+  (function () {
+    var btn = document.getElementById('backBtn');
+    if (!btn) return;
+    function sync() {
+      // history.length 在部分浏览器里始终是 1，额外看 referrer
+      var canGoBack = window.history.length > 1 ||
+        (document.referrer && document.referrer.indexOf(location.origin) === 0);
+      btn.hidden = !canGoBack;
+    }
+    btn.addEventListener('click', function () {
+      if (window.history.length > 1) {
+        window.history.back();
+      } else if (document.referrer && document.referrer.indexOf(location.origin) === 0) {
+        location.href = document.referrer;
+      } else {
+        location.href = '/';
+      }
+    });
+    sync();
+  })();
+</script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -74,6 +74,8 @@ chaquopy {
             install("beautifulsoup4>=4.12")
             install("EbookLib>=0.18")
             install("zhconv>=1.4")
+            // cssselect：lxml 的 CSS 选择器支持，规则型源用得上
+            install("cssselect>=1.2")
             // 带原生扩展：Chaquopy 的 pypi-13.1 镜像里有预编译 wheel
             install("lxml>=5.0")
             install("cryptography>=41.0")

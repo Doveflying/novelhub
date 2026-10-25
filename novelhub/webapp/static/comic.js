@@ -103,21 +103,39 @@
           '&ep=' + encodeURIComponent(epId) +
           '&t=' + encodeURIComponent(flat[at].title)).catch(function () {});
       }
+      // 顶部工具条和底部出口各一对，href 保持一致
       var prev = document.getElementById('prevEp');
       var next = document.getElementById('nextEp');
-      if (prev && at > 0) {
-        prev.href = '/comic/' + encodeURIComponent(key) + '/' + encodeURIComponent(comicId) + '/' +
+      var prev2 = document.getElementById('prevEp2');
+      var next2 = document.getElementById('nextEp2');
+      if (at > 0) {
+        var prevUrl = '/comic/' + encodeURIComponent(key) + '/' + encodeURIComponent(comicId) + '/' +
           flat[at - 1].id + '?t=' + encodeURIComponent(flat[at - 1].title || '');
-        prev.hidden = false;
+        if (prev) { prev.href = prevUrl; prev.hidden = false; }
+        if (prev2) { prev2.href = prevUrl; prev2.hidden = false; }
       }
-      if (next && at + 1 < flat.length) {
-        next.href = '/comic/' + encodeURIComponent(key) + '/' + encodeURIComponent(comicId) + '/' +
+      if (at + 1 < flat.length) {
+        var nextUrl = '/comic/' + encodeURIComponent(key) + '/' + encodeURIComponent(comicId) + '/' +
           flat[at + 1].id + '?t=' + encodeURIComponent(flat[at + 1].title || '');
-        next.hidden = false;
+        if (next) { next.href = nextUrl; next.hidden = false; }
+        if (next2) { next2.href = nextUrl; next2.hidden = false; }
       }
     }).catch(function () {});
   }
 
   load();
   wirePager();
+})();
+
+/* 返回键：有历史就退历史（从章节页/搜索进来的都自然回去），
+   没历史就按 href 回章节页 —— href 留着兜底。 */
+(function () {
+  var back = document.getElementById('comicBack');
+  if (!back) return;
+  back.addEventListener('click', function (e) {
+    if (window.history.length > 1) {
+      e.preventDefault();
+      window.history.back();
+    }
+  });
 })();

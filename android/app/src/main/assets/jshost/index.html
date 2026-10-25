@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>venera-js-host</title>
+</head>
+<body>
+<!--
+  书萤 · Venera JS 源的执行沙箱页。
+
+  这个页面永远不显示给用户（宿主 WebView 是 1x1、不可见、不接收触摸）。
+  它唯一的作用是提供一个完整的 V8 + DOM 环境来跑 refs/venera/sources/*.js。
+
+  加载顺序很重要：bridge.js 必须在 Java 侧调 __veneraRun 之前就位，
+  所以 Java 侧等 onPageFinished 之后再开始派活。
+-->
+<script src="bridge.js"></script>
+</body>
+</html>

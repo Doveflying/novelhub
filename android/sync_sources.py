@@ -9,7 +9,10 @@
 同步内容：
     novelhub/*.py, novelhub/data/, novelhub/jsruntime/, novelhub/sources/
     novelhub/webapp/{templates,static}
+    bookfly/                  Android 端 Python 入口 + Venera JS 宿主
     refs/anime/rules.json, refs/venera/{configs-index.json,sources/}
+
+assets/jshost/ 由 gradle 直接从 src/main/assets 打包，这里不用管。
 """
 from __future__ import annotations
 
@@ -23,6 +26,7 @@ DEST = ROOT / "android" / "app" / "src" / "main" / "python"
 # 目录级同步：(源, 目标相对 DEST)
 DIRS = [
     ("novelhub", "novelhub"),
+    ("bookfly", "bookfly"),
     ("refs/anime", "refs/anime"),
 ]
 

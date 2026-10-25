@@ -4,6 +4,27 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
+    <!--
+        注意：导入本地书**故意不申请**读写存储权限。
+        选文件走 SAF（ACTION_OPEN_DOCUMENT），系统文件选择器会把被选中文件的
+        读权限单独授给本应用，不需要 READ_EXTERNAL_STORAGE / MANAGE_EXTERNAL_STORAGE。
+        好处：targetSdk 35 上那些权限已经失效或要过应用商店审核，而 SAF 在所有
+        ROM 上都能用，用户也不必看到「允许访问照片和文件」的弹窗。
+
+        <queries> 是 Android 11+ 的包可见性声明：不加也能拉起系统选择器，
+        但加上更稳（部分 ROM 对隐式 intent 的可见性判断更严格）。
+    -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.OPEN_DOCUMENT" />
+            <data android:mimeType="*/*" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.GET_CONTENT" />
+            <data android:mimeType="*/*" />
+        </intent>
+    </queries>
+
     <application
         android:name="com.chaquo.python.android.PyApplication"
         android:allowBackup="true"
@@ -21,7 +42,7 @@
             android:exported="true"
             android:configChanges="orientation|screenSize|keyboardHidden|uiMode"
             android:windowSoftInputMode="adjustResize"
-            android:launchMode="singleTask">
+            android:launchMode="singleTop">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
