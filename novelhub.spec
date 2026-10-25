@@ -13,13 +13,41 @@ onefile 用 ``--onefile`` 变量切换：
 import sys
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_submodules
+from PyInstaller.utils.hooks import collect_submodules, copy_metadata, collect_data_files
 
 ROOT = Path(SPECPATH).resolve()
 ONEFILE = False  # True → 单文件 exe（启动慢、易误报，但只有一个文件）
 
-# ---------------------------------------------------------------- 数据文件
+# ---------------------------------------------------------------- 元数据
+# werkzeug 的 make_server 会调 importlib.metadata.version("werkzeug") 取版本，
+# Flask 也会查 flask/werkzeug/jinja2 的元数据。PyInstaller 默认只打代码不打
+# dist-info，冻结后就抛 PackageNotFoundError，服务直接起不来。
+# 这里把用得到的发行版元数据都显式带上。
 datas: list[tuple[str, str]] = []
+for dist in (
+    "flask",
+    "werkzeug",
+    "jinja2",
+    "click",
+    "itsdangerous",
+    "markupsafe",
+    "blinker",
+    "requests",
+    "urllib3",
+    "certifi",
+    "charset-normalizer",
+    "idna",
+    "beautifulsoup4",
+    "soupsieve",
+    "lxml",
+    "ebooklib",
+    "zhconv",
+    "cryptography",
+):
+    try:
+        datas += copy_metadata(dist)
+    except Exception:  # noqa: BLE001  没装的包跳过
+        pass
 
 
 def add(src: str | Path, dest: str) -> None:

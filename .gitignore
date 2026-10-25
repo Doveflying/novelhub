@@ -61,6 +61,20 @@ design/*.png
 # ============ 构建用的临时环境 ============
 .build-venv/
 
+# ============ Android 构建 ============
+# Gradle / AGP 产物
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+*.iml
+# sync_sources.py 从仓库根拷进来的副本，源头在 novelhub/ 与 refs/，
+# 不重复提交（否则改一处要改两处，必然不同步）
+android/app/src/main/python/
+# APK 产物
+dist/android/
+
 # ============ Python ============
 __pycache__/
 *.py[cod]

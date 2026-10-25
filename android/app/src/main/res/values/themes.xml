@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.BookFly" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:statusBarColor">#FFF6F9</item>
+        <item name="android:navigationBarColor">#FFF6F9</item>
+        <item name="android:windowBackground">#FFF6F9</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+</resources>

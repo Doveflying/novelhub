@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FFF6F9">
+
+    <WebView
+        android:id="@+id/web"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <!-- 启动遮罩：Python 起来之前别让用户看白屏 -->
+    <FrameLayout
+        android:id="@+id/splash"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#FFF6F9">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:paddingLeft="32dp"
+            android:paddingRight="32dp">
+
+            <ImageView
+                android:layout_width="88dp"
+                android:layout_height="88dp"
+                android:src="@mipmap/ic_launcher"
+                android:contentDescription="@string/app_name" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:text="@string/app_name"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:textColor="#2B2131" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="@string/app_sub"
+                android:textSize="12sp"
+                android:letterSpacing="0.14"
+                android:textColor="#8A7C93" />
+
+            <TextView
+                android:id="@+id/status"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="28dp"
+                android:text="@string/booting"
+                android:textSize="13sp"
+                android:textColor="#6B5F74"
+                android:gravity="center" />
+        </LinearLayout>
+    </FrameLayout>
+
+    <ProgressBar
+        android:id="@+id/progress"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="3dp"
+        android:layout_gravity="top"
+        android:max="100"
+        android:progressTint="#FF4F87"
+        android:progressBackgroundTint="#00000000"
+        android:visibility="gone" />
+</FrameLayout>

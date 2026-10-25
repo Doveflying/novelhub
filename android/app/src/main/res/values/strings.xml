@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">书萤</string>
+    <string name="app_sub">FIREFLY LIBRARY</string>
+    <string name="booting">正在启动…</string>
+</resources>

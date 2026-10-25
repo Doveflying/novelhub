@@ -198,47 +198,141 @@ def run_server(port: int) -> threading.Thread:
     return t
 
 
-def _window_proc_for(pid: int) -> int:
-    """按 PID 找到该进程的顶层窗口，返回 hwnd（找不到返回 0）。"""
+_BROWSER_EXES = {"msedge.exe", "chrome.exe", "brave.exe", "opera.exe", "vivaldi.exe", "chromium.exe"}
+
+
+def _window_exe(hwnd: int) -> str:
+    """取窗口所属进程的 exe 文件名（小写）。失败返回空串。"""
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        user32 = ctypes.windll.user32
+        kernel32 = ctypes.windll.kernel32
+        pid = wintypes.DWORD()
+        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+        if not pid.value:
+            return ""
+        # PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+        h = kernel32.OpenProcess(0x1000, False, pid.value)
+        if not h:
+            return ""
+        try:
+            buf = ctypes.create_unicode_buffer(1024)
+            size = wintypes.DWORD(1024)
+            if not kernel32.QueryFullProcessImageNameW(h, 0, buf, ctypes.byref(size)):
+                return ""
+            return os.path.basename(buf.value).lower()
+        finally:
+            kernel32.CloseHandle(h)
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def _find_app_windows() -> list[int]:
+    """找出「书萤应用窗口」——浏览器进程 + 标题含 APP_NAME 的可见顶层窗口。
+
+    两个判据都要，缺一不可：
+
+    - 只按标题：快捷方式指向的 dist\\书萤 文件夹，在资源管理器里标题是
+      「书萤 - 文件资源管理器」，也会命中，于是启动器永远以为窗口还在，
+      用户关了应用进程也不退出。
+    - 只按进程：Chromium 起 --app 时常常把窗口交给已在运行的浏览器主进程，
+      我们 spawn 的那个进程秒退，按 PID 找不到。
+
+    所以：进程必须是浏览器，标题必须含 APP_NAME。
+    """
     if os.name != "nt":
-        return 0
+        return []
     try:
         import ctypes
         from ctypes import wintypes
 
         user32 = ctypes.windll.user32
         found: list[int] = []
+        buf = ctypes.create_unicode_buffer(512)
 
         @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
         def _cb(hwnd, _lparam):
-            wpid = wintypes.DWORD()
-            user32.GetWindowThreadProcessId(hwnd, ctypes.byref(wpid))
-            if wpid.value == pid and user32.IsWindowVisible(hwnd):
+            if not user32.IsWindowVisible(hwnd):
+                return True
+            n = user32.GetWindowTextW(hwnd, buf, 512)
+            if not n or APP_NAME not in buf.value:
+                return True
+            if _window_exe(hwnd) in _BROWSER_EXES:
                 found.append(hwnd)
-                return False
             return True
 
         user32.EnumWindows(_cb, 0)
-        return found[0] if found else 0
+        return found
     except Exception:  # noqa: BLE001
-        return 0
+        return []
 
 
-def _wait_for_app_window(proc: subprocess.Popen, timeout: float = 25.0) -> int:
-    """等 --app 窗口真的出现，返回 hwnd；超时返回 0。
-
-    直接 poll 进程退出不可靠：Chromium 起 --app 时常常由已有浏览器进程接管，
-    启动器进程秒退但窗口还在。所以以「该 PID 的可见顶层窗口」为准。
-    """
+def _wait_for_app_window(timeout: float = 30.0) -> bool:
+    """等应用窗口出现。出现返回 True，超时返回 False。"""
     deadline = time.time() + timeout
     while time.time() < deadline:
-        if proc.poll() is not None and proc.returncode not in (0, None):
-            return 0
-        hwnd = _window_proc_for(proc.pid)
-        if hwnd:
-            return hwnd
-        time.sleep(0.3)
-    return 0
+        if _find_app_windows():
+            return True
+        time.sleep(0.4)
+    return False
+
+
+def _profile_dir() -> Path:
+    from novelhub import paths
+
+    return paths.data_root() / "window-profile"
+
+
+def _clear_port_file() -> None:
+    """退出时把 .instance.port 清掉，否则下次启动会拿旧端口去唤醒不存在的实例。"""
+    try:
+        p = _lock_path().with_name(".instance.port")
+        if p.exists():
+            p.unlink()
+    except OSError:
+        pass
+
+
+def _message_box(text: str, title: str = APP_NAME, error: bool = False) -> None:
+    """windowed exe 没有控制台，出错必须弹窗，否则用户只看到「双击没反应」。"""
+    try:
+        import ctypes
+
+        flags = 0x00000010 if error else 0x00000040  # MB_ICONERROR / MB_ICONINFORMATION
+        ctypes.windll.user32.MessageBoxW(0, text, title, flags)
+    except Exception:  # noqa: BLE001
+        print(f"{title}: {text}", file=sys.stderr)
+
+
+def _install_crash_log() -> Path | None:
+    """把未捕获异常写到数据目录，方便用户把文件发回来。"""
+    import traceback
+
+    try:
+        from novelhub import paths
+
+        log = paths.data_root() / "startup-error.log"
+    except Exception:  # noqa: BLE001
+        return None
+
+    def _hook(exc_type, exc, tb):
+        try:
+            log.write_text(
+                "".join(traceback.format_exception(exc_type, exc, tb)), encoding="utf-8"
+            )
+        except OSError:
+            pass
+        _message_box(
+            f"启动时出错：{exc_type.__name__}: {exc}\n\n"
+            f"详细信息已写入：\n{log}",
+            error=True,
+        )
+        sys.__excepthook__(exc_type, exc, tb)
+
+    sys.excepthook = _hook
+    return log
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -249,78 +343,80 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--browser", default="", help="指定浏览器 exe 路径")
     args = ap.parse_args(argv)
 
+    _install_crash_log()
+
+    # 已经有实例在跑：把它的窗口叫到前台，别再起一个
     if not _acquire_single_instance():
         port = _read_running_port()
-        if port:
-            url = f"http://127.0.0.1:{port}/"
-            browser = find_chromium()
-            if browser and not args.no_window:
-                open_app_window(browser, url, _profile_dir())
-            else:
-                open_fallback(url)
+        if not port:
+            _message_box("书萤已经在运行，但读不到它的端口。\n"
+                         "请先在任务管理器结束「书萤」进程再试。")
+            return 0
+        url = f"http://127.0.0.1:{port}/"
+        browser = find_chromium()
+        if browser and not args.no_window:
+            open_app_window(browser, url, _profile_dir())
+        else:
+            open_fallback(url)
         return 0
 
     port = pick_port(args.port)
-    run_server(port)
-    if not wait_ready(port):
-        print("服务启动失败：/healthz 无响应", file=sys.stderr)
+    try:
+        run_server(port)
+    except Exception as exc:  # noqa: BLE001
+        _message_box(f"服务启动失败：{exc}", error=True)
         return 1
+
+    if not wait_ready(port):
+        _message_box(
+            "服务没有在 40 秒内就绪。\n\n"
+            "常见原因：\n"
+            "  · 8899 附近端口被占用（关掉其他书萤实例）\n"
+            "  · 数据目录不可写（检查 exe 所在文件夹权限）",
+            error=True,
+        )
+        return 1
+
     _write_running_port(port)
     url = f"http://127.0.0.1:{port}/"
 
-    if args.no_window:
-        print(f"{APP_NAME} 已启动：{url}")
-        try:
+    try:
+        if args.no_window:
+            print(f"{APP_NAME} 已启动：{url}")
             while True:
                 time.sleep(3600)
-        except KeyboardInterrupt:
-            return 0
 
-    browser = Path(args.browser) if args.browser else find_chromium()
-    if browser is None or not browser.exists():
-        open_fallback(url)
-        # 退回默认浏览器时没法感知窗口关闭，只能挂着等用户从托盘/任务管理器结束
-        try:
+        browser = Path(args.browser) if args.browser else find_chromium()
+        if browser is None or not browser.exists():
+            open_fallback(url)
+            # 退回默认浏览器时没法感知窗口关闭，只能挂着
             while True:
                 time.sleep(3600)
-        except KeyboardInterrupt:
-            return 0
 
-    proc = open_app_window(browser, url, _profile_dir())
-    if proc is None:
-        open_fallback(url)
-        try:
+        proc = open_app_window(browser, url, _profile_dir())
+        if proc is None:
+            open_fallback(url)
             while True:
                 time.sleep(3600)
-        except KeyboardInterrupt:
-            return 0
 
-    hwnd = _wait_for_app_window(proc)
-    if hwnd == 0:
-        # 窗口没等到（可能被已有实例接管），保持服务存活
-        try:
+        if not _wait_for_app_window(30.0):
+            # 窗口没等到：可能浏览器把它当标签页开了，或启动很慢。
+            # 这时不能直接退出（服务刚起来），保持存活让用户自己关。
             while True:
                 time.sleep(3600)
-        except KeyboardInterrupt:
-            return 0
 
-    # 有窗口了：轮询窗口是否还在，没了就退出（=关窗即退）
-    import ctypes
-
-    user32 = ctypes.windll.user32
-    while True:
-        time.sleep(1.0)
-        if not user32.IsWindow(hwnd):
-            return 0
-        if proc.poll() is not None and proc.returncode not in (0, None):
-            return 0
-
-
-def _profile_dir() -> Path:
-    from novelhub import paths
-
-    return paths.data_root() / "window-profile"
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
+        # 窗口已在：轮询它是否还在。连续 3 次（约 3 秒）都看不到才算关闭，
+        # 避免页面跳转瞬间标题变化导致误判。
+        gone = 0
+        while True:
+            time.sleep(1.0)
+            if _find_app_windows():
+                gone = 0
+            else:
+                gone += 1
+                if gone >= 3:
+                    return 0
+    except KeyboardInterrupt:
+        return 0
+    finally:
+        _clear_port_file()
