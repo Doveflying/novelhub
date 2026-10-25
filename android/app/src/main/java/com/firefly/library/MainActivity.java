@@ -154,6 +154,10 @@ public class MainActivity extends AppCompatActivity {
 
         web.setBackgroundColor(0xFFFFFFFF);
 
+        // 原生导入通道：页面检测到 window.NativeImport 就优先走它，
+        // 文件由 ContentResolver 复制到私有目录，不经过 HTTP 上传。
+        web.addJavascriptInterface(new NativeImportBridge(this), "NativeImport");
+
         web.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest req) {
@@ -317,6 +321,15 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        // 原生导入：复制文件进收件箱，再回调页面
+        if (requestCode == NativeImportBridge.REQ_NATIVE_IMPORT) {
+            java.util.List<String> paths = null;
+            if (resultCode == RESULT_OK) {
+                paths = NativeImportBridge.handleResult(this, data);
+            }
+            dispatchNativeImport(paths);
+            return;
+        }
         if (requestCode == REQ_FILE_CHOOSER) {
             if (filePathCallback == null) {
                 super.onActivityResult(requestCode, resultCode, data);
@@ -341,6 +354,27 @@ public class MainActivity extends AppCompatActivity {
         } else {
             super.onBackPressed();
         }
+    }
+
+    /**
+     * 把原生导入的结果交回页面。
+     *
+     * paths 为 null 表示用户取消或出错，页面据此恢复按钮状态；
+     * 非 null 时调 window.onNativeImport(paths) 让页面去 POST /api/import/inbox。
+     */
+    void dispatchNativeImport(java.util.List<String> paths) {
+        if (web == null) return;
+        final String json = NativeImportBridge.toJson(paths);
+        Log.i(TAG, "native import -> " + NativeImportBridge.describe(paths));
+        web.evaluateJavascript(
+                "window.onNativeImport && window.onNativeImport(" + json + ");", null);
+    }
+
+    /** 原生通道不可用（系统没有文件选择器）：让页面退回 <input type=file>。 */
+    void dispatchNativeImportUnavailable() {
+        if (web == null) return;
+        web.evaluateJavascript(
+                "window.onNativeImportUnavailable && window.onNativeImportUnavailable();", null);
     }
 
     @Override

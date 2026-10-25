@@ -1516,6 +1516,61 @@ def create_app(cfg: Config | None = None) -> Flask:
             return redirect(url_for("book", bid=ids[0]))
         return redirect(url_for("index"))
 
+    # ---------------- 移动端：从「收件箱」导入 ----------------
+    #
+    # 手机上用 <input type="file"> 上传大文件会走 HTTP multipart，
+    # 几十 MB 的 epub 传到一半断掉是常事。既然 Python 后端就在本机，
+    # 更稳的路径是：Java 侧用 ContentResolver 把文件复制到
+    # <filesDir>/inbox/，再把路径交给这里直接读 —— 不经网络。
+    @app.post("/api/import/inbox")
+    def api_import_inbox():
+        from pathlib import Path as _P
+
+        body = request.get_json(silent=True) or {}
+        paths = body.get("paths") or []
+        if not isinstance(paths, list) or not paths:
+            return jsonify(ok=False, error="没有收到文件路径"), 400
+
+        # 只允许收件箱里的文件，避免被当成任意文件读取接口
+        inbox = cfg.data_path.parent / "inbox"
+        try:
+            inbox_resolved = inbox.resolve()
+        except OSError:
+            inbox_resolved = inbox
+
+        ids: list[int] = []
+        errors: list[str] = []
+        for raw in paths[:50]:
+            try:
+                p = _P(str(raw)).resolve()
+            except (OSError, ValueError):
+                errors.append(f"{raw}: 路径无效")
+                continue
+            # 必须落在收件箱内
+            try:
+                p.relative_to(inbox_resolved)
+            except ValueError:
+                errors.append(f"{p.name}: 不在收件目录内")
+                continue
+            if not p.exists():
+                errors.append(f"{p.name}: 文件不存在")
+                continue
+            if p.suffix.lower() not in (".txt", ".epub", ".md", ".markdown"):
+                errors.append(f"{p.name}: 不支持的格式")
+                continue
+            try:
+                ids += importer.import_path(p)
+            except Exception as exc:  # noqa: BLE001
+                errors.append(f"{p.name}: {exc}")
+
+        return jsonify(
+            ok=bool(ids),
+            imported=len(ids),
+            book_ids=ids,
+            errors=errors,
+            redirect=(url_for("book", bid=ids[0]) if len(ids) == 1 else url_for("index")),
+        )
+
     # ---------------- 封面 / 插图 / 导出 / 删除 ----------------
     @app.get("/media/<int:bid>/<path:name>")
     def media(bid: int, name: str):

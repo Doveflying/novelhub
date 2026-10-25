@@ -53,6 +53,8 @@
 @media (max-width: 760px), (pointer: coarse) {
   .dock-btn,
   .icon-btn,
+  .iconbtn,
+  .appbar-in .backbtn,
   .tabbar a,
   .tabbar button,
   /* 底部导航实际用的是 .tab，它的 height 规则优先级比 .tabbar a 高 */
@@ -217,10 +219,18 @@
   /* 手机上不显示「磁盘路径」那一栏 —— 电脑版专属 */
   .imp-path { display: none !important; }
 
+  /* 选文件区：整块虚线框 + 一个实心按钮。
+     以前用 <label for> 包裹 input 做点击区，Android WebView 里
+     那是双重关联（label 的 for 指向自己内部的控件），点一下会被
+     转发两次或者被吞掉 —— 表现就是「点了没反应」。
+     现在 label 只是普通容器，点击由 JS 统一调 input.click()。 */
   .imp-pick {
     position: relative;
-    display: block;
-    padding: 18px 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 20px 16px;
     border: 2px dashed var(--line-strong);
     border-radius: 14px;
     background: var(--surface-2);
@@ -228,15 +238,17 @@
     cursor: pointer;
   }
   .imp-pick::before {
-    content: "点这里选文件";
+    content: "把文件丢进来";
     display: block;
-    margin-bottom: 6px;
     font-size: 15px;
     font-weight: 600;
     color: var(--accent);
   }
-  .imp-pick > span { font-size: 11.5px; color: var(--muted); }
-  /* 原生 input 藏起来，用整块 label 触发；不能 display:none，否则 iOS 不弹选择器 */
+  .imp-pick-hint { font-size: 11.5px; color: var(--muted); }
+
+  /* input 铺满整块当兜底点击区。
+     不能用 display:none（iOS/WebView 会认为不可交互），
+     也不能挡住按钮 —— z-index 压在按钮下面。 */
   .imp-pick input[type="file"] {
     position: absolute;
     inset: 0;
@@ -244,7 +256,18 @@
     height: 100%;
     opacity: 0;
     cursor: pointer;
+    z-index: 1;
   }
+
+  /* 实心按钮要在 input 之上，否则点不到 */
+  .imp-pick-btn {
+    position: relative;
+    z-index: 2;
+    min-height: 44px;
+    min-width: 160px;
+    pointer-events: auto;
+  }
+
   .imp-pick:active { border-color: var(--accent); background: var(--accent-soft); }
 
   .imp-list {

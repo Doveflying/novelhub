@@ -19,13 +19,22 @@
         action="{{ url_for('import_upload') }}" enctype="multipart/form-data">
     <h2>上传文件</h2>
 
-    <label class="field imp-pick" for="impFiles">
-      <span>txt / epub / md，可多选</span>
+    {#- 不要给 label 写 for，也不要让 label 包裹 input。
+        Android WebView 里「label for=自己内部的 input」是双重关联：
+        点一下会转发两次点击，或者干脆把事件吞掉 —— 表现就是「点了没反应」。
+        这里让 label 只是普通容器，input 自己铺满整块做点击区。 -#}
+    <div class="field imp-pick" id="impPick">
+      <span class="imp-pick-hint">txt / epub / md，可多选</span>
       {#- accept 要同时写扩展名和 MIME：安卓的文件选择器只认 MIME，
          光写 .epub / .md 会把这两类文件灰掉，用户选不了。 -#}
       <input type="file" name="files" id="impFiles" multiple
              accept=".txt,.epub,.md,.markdown,text/plain,application/epub+zip,text/markdown,text/x-markdown,application/octet-stream">
-    </label>
+      {#- 显式按钮：部分 WebView（尤其国产 ROM）对「透明 input 覆盖层」的点击
+         不可靠，多给一个实心按钮直接调 input.click()，成功率最高。 -#}
+      <button class="btn btn-accent imp-pick-btn" type="button" id="impPickBtn">
+        <svg class="ico sm"><use href="#i-upload"/></svg>选择文件
+      </button>
+    </div>
 
     <div class="imp-list" id="impList" hidden></div>
 
@@ -64,6 +73,8 @@
   var form = document.getElementById('impForm');
   var btn = document.getElementById('impSubmit');
   var status = document.getElementById('impStatus');
+  var pick = document.getElementById('impPick');
+  var pickBtn = document.getElementById('impPickBtn');
   if (!input || !form) return;
 
   function fmt(bytes) {
@@ -72,7 +83,97 @@
     return (bytes / 1024 / 1024).toFixed(1) + ' MB';
   }
 
-  // 选完文件先列出来，手机上能确认选对了再提交
+  /* ---------- 打开文件选择器 ----------
+     APK 里有原生通道（window.NativeImport）时优先用它：
+     Java 侧用 ContentResolver 把文件复制到 App 私有目录，
+     再把路径交给 /api/import/inbox —— 完全不经过 HTTP 上传，
+     几十 MB 的 epub 也不会传到一半断掉。
+
+     没有原生通道（浏览器/PWA）才走 <input type="file">。 */
+  var opening = false;
+  var nativeBroken = false;   // 原生通道试过但不可用
+
+  function useNative() {
+    if (nativeBroken) return false;
+    return !!(window.NativeImport && window.NativeImport.available
+              && window.NativeImport.available());
+  }
+
+  function openPicker(e) {
+    if (e) e.preventDefault();
+    if (opening) return;
+    opening = true;
+    setTimeout(function () { opening = false; }, 800);
+
+    if (useNative()) {
+      try {
+        if (status) status.textContent = '正在打开文件选择器…';
+        window.NativeImport.pickAndCopy();
+        return;
+      } catch (err) {
+        /* 掉下去用网页上传 */
+      }
+    }
+    try {
+      input.click();
+    } catch (err2) {
+      if (status) status.textContent = '打不开文件选择器：' + err2;
+    }
+  }
+
+  /* 原生通道不可用 → 退回网页上传 */
+  window.onNativeImportUnavailable = function () {
+    nativeBroken = true;
+    if (status) status.textContent = '原生导入不可用，改用网页上传';
+    try { input.click(); } catch (err) { /* 已经尽力 */ }
+  };
+
+  /* 原生侧复制完会调这个；null 表示用户取消 */
+  window.onNativeImport = function (paths) {    if (!paths || !paths.length) {
+      if (status) status.textContent = '没有选中文件';
+      if (btn) btn.disabled = false;
+      return;
+    }
+    if (status) status.textContent = '已选中 ' + paths.length + ' 个文件，正在导入…';
+    if (btn) btn.disabled = true;
+
+    fetch('{{ url_for("api_import_inbox") }}', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paths: paths })
+    }).then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d && d.ok) {
+          if (status) status.textContent = '导入完成，共 ' + d.imported + ' 本，正在打开…';
+          window.location.href = d.redirect || '/';
+        } else {
+          if (btn) btn.disabled = false;
+          var msg = (d && d.errors && d.errors.length) ? d.errors.join('；')
+                                                        : '导入失败';
+          if (status) status.textContent = msg;
+        }
+      })
+      .catch(function () {
+        if (btn) btn.disabled = false;
+        if (status) status.textContent = '导入请求失败，重试一次';
+      });
+  };
+
+  if (pickBtn) pickBtn.addEventListener('click', openPicker);
+  if (pick) {
+    pick.addEventListener('click', function (e) {
+      // 点在 input 本身上时交给它自己处理，别再叠一次
+      if (e.target === input) return;
+      openPicker(e);
+    });
+  }
+
+  /* 有原生通道就不显示原生 input 的覆盖层提示，避免两条路互相干扰 */
+  if (useNative() && status) {
+    status.textContent = '这台设备支持原生导入，大文件也能直接进';
+  }
+
+  /* 选完文件先列出来，手机上能确认选对了再提交 */
   input.addEventListener('change', function () {
     var files = input.files || [];
     if (!files.length) { list.hidden = true; list.innerHTML = ''; return; }
@@ -87,12 +188,18 @@
     list.innerHTML = html;
     list.hidden = false;
     if (status) status.textContent = '';
+    if (btn) btn.disabled = false;
   });
 
-  // 上传：手机上大文件会等很久，必须给进度，否则看着像没反应
+  /* 上传：手机上大文件会等很久，必须给进度，否则看着像没反应 */
   form.addEventListener('submit', function (e) {
     var files = input.files || [];
-    if (!files.length) return;             // 让后端去提示「没选文件」
+    if (!files.length) {
+      // 明确提示，别静默跳转
+      e.preventDefault();
+      if (status) status.textContent = '还没选文件 —— 先点上面的「选择文件」';
+      return;
+    }
     if (!window.FormData || !window.XMLHttpRequest) return;  // 老浏览器直接原生提交
 
     e.preventDefault();
