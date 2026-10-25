@@ -42,8 +42,10 @@ def _load_rule_sources() -> dict[str, tuple[str, str, str]]:
     import json
     from pathlib import Path
 
+    from .. import paths
+
     out: dict[str, tuple[str, str, str]] = {}
-    p = Path(__file__).resolve().parent.parent.parent / "refs" / "anime" / "rules.json"
+    p = paths.resource("refs", "anime", "rules.json")
     if not p.exists():
         return out
     try:

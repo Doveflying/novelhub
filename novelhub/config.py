@@ -8,8 +8,16 @@ import time
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
-CONFIG_PATH = ROOT / "config.json"
+from . import paths
+
+# ROOT 保留旧语义（仓库根），但源码运行 / 冻结 exe / 移动端三种形态下要
+# 分别落到正确的位置，统一走 novelhub.paths：
+#   ROOT       → 可写根（config.json 所在处）
+#   CONFIG_PATH→ 可写根下的 config.json
+#   DATA_ROOT  → 书库 / 缓存 / 导出
+ROOT = paths.app_root()
+CONFIG_PATH = paths.config_path()
+DATA_ROOT = paths.data_root()
 
 # 代理探测结果缓存（进程级）
 _PROXY_CACHE: list[str] | None = None
@@ -73,7 +81,7 @@ class Config:
     def data_path(self) -> Path:
         p = Path(self.data_dir)
         if not p.is_absolute():
-            p = ROOT / p
+            p = DATA_ROOT / p
         p.mkdir(parents=True, exist_ok=True)
         return p
 
@@ -91,12 +99,13 @@ class Config:
     def export_path(self) -> Path:
         p = Path(self.export_dir)
         if not p.is_absolute():
-            p = ROOT / p
+            p = DATA_ROOT / p
         p.mkdir(parents=True, exist_ok=True)
         return p
 
     def save(self) -> None:
         data = asdict(self)
+        CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
         CONFIG_PATH.write_text(
             json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
         )

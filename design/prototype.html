@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="paper">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>轻库 · 界面重设计原型</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231f1c18'/%3E%3Ctext x='16' y='23' font-size='18' font-family='serif' font-weight='bold' text-anchor='middle' fill='%23f6f2e9'%3E%E8%BD%BB%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="proto.css">
+</head>
+<body>
+
+<!-- ============ SVG sprite ============ -->
+<svg class="sprite" aria-hidden="true" focusable="false">
+  <symbol id="i-shelf" viewBox="0 0 24 24"><path d="M4 4.5h4.5V20H4z"/><path d="M10.5 4.5H15V20h-4.5z"/><path d="M16.4 5.6l3.5 13.6-2.2.6L14.2 6.2z"/></symbol>
+  <symbol id="i-comic" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><circle cx="8.5" cy="9.5" r="1.4"/><path d="M4.5 16.5l4.6-4.3 3.4 3 2.6-2.4 4.4 4.2"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M10.2 8.8l5 3.2-5 3.2z"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 1.8"/></symbol>
+  <symbol id="i-compass" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M14.9 9.1l-1.6 4.2-4.2 1.6 1.6-4.2z"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v10"/><path d="M8.2 10.4L12 14.2l3.8-3.8"/><path d="M4.5 16.5v2a1.5 1.5 0 001.5 1.5h12a1.5 1.5 0 001.5-1.5v-2"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15V5"/><path d="M8.2 8.8L12 5l3.8 3.8"/><path d="M4.5 16.5v2a1.5 1.5 0 001.5 1.5h12a1.5 1.5 0 001.5-1.5v-2"/></symbol>
+  <symbol id="i-server" viewBox="0 0 24 24"><rect x="4" y="4.5" width="16" height="6" rx="2"/><rect x="4" y="13.5" width="16" height="6" rx="2"/><path d="M8 7.5h.01M8 16.5h.01"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6L17 7M7 17l-1.4 1.4"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M19.5 14.4A7.8 7.8 0 019.6 4.5 8 8 0 1019.5 14.4z"/></symbol>
+  <symbol id="i-chev-l" viewBox="0 0 24 24"><path d="M14.5 6.5L9 12l5.5 5.5"/></symbol>
+  <symbol id="i-chev-r" viewBox="0 0 24 24"><path d="M9.5 6.5L15 12l-5.5 5.5"/></symbol>
+  <symbol id="i-chev-d" viewBox="0 0 24 24"><path d="M6.5 9.5L12 15l5.5-5.5"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="6" cy="12" r="1.1"/><circle cx="12" cy="12" r="1.1"/><circle cx="18" cy="12" r="1.1"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 7h7M15 7h5M4 17h5M13 17h7"/><circle cx="13" cy="7" r="2"/><circle cx="11" cy="17" r="2"/></symbol>
+  <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M7 4.5h10a1 1 0 011 1V20l-6-3.6L6 20V5.5a1 1 0 011-1z"/></symbol>
+  <symbol id="i-arrow-l" viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></symbol>
+  <symbol id="i-arrow-r" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4.5 7h15M9 7V5.5A1.5 1.5 0 0110.5 4h3A1.5 1.5 0 0115 5.5V7M6.5 7l.8 12a1.5 1.5 0 001.5 1.4h6.4a1.5 1.5 0 001.5-1.4l.8-12"/></symbol>
+  <symbol id="i-type" viewBox="0 0 24 24"><path d="M4.5 19L10 5l5.5 14M6.5 14.5h7M16 11h4.5M18.2 11v8"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 11-2.2-5.3"/><path d="M19.5 4.5V8h-3.5"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 24 24"><rect x="4" y="4" width="6.5" height="6.5" rx="1.2"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.2"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.2"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.2"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+  <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 4.5h5.5V10M19 5l-7.5 7.5"/><path d="M18 14v4.5a1.5 1.5 0 01-1.5 1.5h-11A1.5 1.5 0 014 18.5v-11A1.5 1.5 0 015.5 6H10"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 4.5l2.3 4.9 5.2.7-3.8 3.7.9 5.2-4.6-2.5-4.6 2.5.9-5.2L4.5 10l5.2-.7z"/></symbol>
+  <symbol id="i-book-open" viewBox="0 0 24 24"><path d="M12 6.5C10.4 5.2 8.4 4.5 4.5 4.5v13c3.9 0 5.9.7 7.5 2 1.6-1.3 3.6-2 7.5-2v-13c-3.9 0-5.9.7-7.5 2z"/><path d="M12 6.5v13"/></symbol>
+  <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3.5 7.5A1.5 1.5 0 015 6h4l2 2.5h8a1.5 1.5 0 011.5 1.5v8A1.5 1.5 0 0119 19.5H5A1.5 1.5 0 013.5 18z"/></symbol>
+</svg>
+
+<div class="app">
+  <!-- ============ Sidebar ============ -->
+  <aside class="rail">
+    <div class="brand">
+      <div class="brand-mark">轻</div>
+      <div class="brand-text">
+        <div class="brand-name">轻库</div>
+        <div class="brand-sub">PAPER LIBRARY</div>
+      </div>
+    </div>
+
+    <nav class="rail-nav" aria-label="主导航">
+      <div class="rail-group">
+        <div class="rail-label">媒体</div>
+        <a class="rail-link on" href="#" data-go="shelf" title="书架"><svg class="ico"><use href="#i-shelf"/></svg><span>书架</span><em class="count">12</em></a>
+        <a class="rail-link" href="#" data-go="comics" title="漫画"><svg class="ico"><use href="#i-comic"/></svg><span>漫画</span><em class="count">8</em></a>
+        <a class="rail-link" href="#" data-go="anime" title="动漫"><svg class="ico"><use href="#i-play"/></svg><span>动漫</span></a>
+      </div>
+      <div class="rail-group">
+        <div class="rail-label">我的</div>
+        <a class="rail-link" href="#" data-go="history" title="历史"><svg class="ico"><use href="#i-clock"/></svg><span>历史</span></a>
+        <a class="rail-link" href="#" data-go="search" title="发现"><svg class="ico"><use href="#i-compass"/></svg><span>发现</span></a>
+      </div>
+      <div class="rail-group">
+        <div class="rail-label">管理</div>
+        <a class="rail-link" href="#" data-go="crawl" title="抓取"><svg class="ico"><use href="#i-download"/></svg><span>抓取</span></a>
+        <a class="rail-link" href="#" data-go="import" title="导入"><svg class="ico"><use href="#i-upload"/></svg><span>导入</span></a>
+        <a class="rail-link" href="#" data-go="sources" title="书源"><svg class="ico"><use href="#i-server"/></svg><span>书源</span><em class="count">8</em></a>
+      </div>
+    </nav>
+
+    <div class="rail-foot">
+      <div class="rail-card">
+        <div class="rc-label">本地占用</div>
+        <div class="rc-value">1.8 <small style="font-size:11px;color:var(--muted)">GB</small></div>
+        <div class="rc-bar"><i style="width:36%"></i></div>
+        <div class="rc-note">2,726 章 · 38.4 万字</div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="shell">
+    <!-- ============ Topbar ============ -->
+    <header class="appbar">
+      <div class="appbar-in">
+        <div class="brand-mini"><span>轻</span></div>
+        <div class="crumb">轻库 <span style="opacity:.45">/</span> <b>书架</b></div>
+        <label class="searchbox">
+          <svg class="ico sm"><use href="#i-search"/></svg>
+          <input id="globalSearch" type="search" placeholder="搜索书名、作者或正文…" aria-label="全局搜索">
+          <span class="kbd">⌘ K</span>
+        </label>
+        <div class="appbar-actions">
+          <button class="btn btn-accent" data-go="crawl"><svg class="ico"><use href="#i-plus"/></svg><span>添加</span></button>
+          <button class="iconbtn" id="themeBtn" aria-label="切换主题" title="切换主题"><svg class="ico"><use href="#i-sun"/></svg></button>
+          <button class="iconbtn" id="refreshBtn" aria-label="刷新" title="刷新这一页"><svg class="ico"><use href="#i-refresh"/></svg></button>
+        </div>
+      </div>
+    </header>
+
+    <main class="main">
+
+      <!-- ==================== 书架 ==================== -->
+      <section class="view on" data-view="shelf">
+        <div class="page-head">
+          <div>
+            <div class="eyebrow">Library</div>
+            <h1 class="page-title">书架</h1>
+            <p class="page-sub">12 本藏书 · 2,726 章 · 已下载 6 本</p>
+          </div>
+          <div class="page-head-actions">
+            <button class="btn btn-ghost" data-go="import"><svg class="ico"><use href="#i-upload"/></svg>导入本地文件</button>
+            <button class="btn btn-accent" data-go="crawl"><svg class="ico"><use href="#i-plus"/></svg>抓取新书</button>
+          </div>
+        </div>
+
+        <div class="continue-row">
+          <article class="cont-card">
+            <div class="cont-cover"><img src="../data/covers/12.jpg" alt=""></div>
+            <div class="cont-body">
+              <div class="cont-kicker">继续阅读</div>
+              <h3 class="cont-title">无职转生 ～到了异世界就拿出真本事～</h3>
+              <p class="cont-ch">第 7 卷 · 第 2 章　街角的相遇</p>
+              <div class="cont-foot">
+                <div class="progress"><i style="width:28%"></i></div>
+                <span class="cont-pct">28%</span>
+                <button class="cont-go" data-go="reader" aria-label="继续阅读"><svg class="ico sm"><use href="#i-arrow-r"/></svg></button>
+              </div>
+            </div>
+          </article>
+          <article class="cont-card">
+            <div class="cont-cover"><img src="../data/covers/14.jpg" alt=""></div>
+            <div class="cont-body">
+              <div class="cont-kicker">继续阅读</div>
+              <h3 class="cont-title">欢迎来到实力至上主义的教室</h3>
+              <p class="cont-ch">第 11 卷 · 第 5 章　文化祭前夜</p>
+              <div class="cont-foot">
+                <div class="progress"><i style="width:52%"></i></div>
+                <span class="cont-pct">52%</span>
+                <button class="cont-go" data-go="reader" aria-label="继续阅读"><svg class="ico sm"><use href="#i-arrow-r"/></svg></button>
+              </div>
+            </div>
+          </article>
+          <article class="cont-card">
+            <div class="cont-cover"><img src="../data/covers/11.jpg" alt=""></div>
+            <div class="cont-body">
+              <div class="cont-kicker">继续阅读</div>
+              <h3 class="cont-title">妹妹人生</h3>
+              <p class="cont-ch">上卷 · 第 3 章　夏天的房间</p>
+              <div class="cont-foot">
+                <div class="progress"><i style="width:36%"></i></div>
+                <span class="cont-pct">36%</span>
+                <button class="cont-go" data-go="reader" aria-label="继续阅读"><svg class="ico sm"><use href="#i-arrow-r"/></svg></button>
+              </div>
+            </div>
+          </article>
+        </div>
+
+        <div class="shelf-toolbar">
+          <div class="seg" role="tablist" aria-label="筛选">
+            <button class="on" data-filter="all" role="tab" aria-selected="true">全部</button>
+            <button data-filter="reading" role="tab">在读</button>
+            <button data-filter="done" role="tab">已下载</button>
+            <button data-filter="online" role="tab">在线</button>
+          </div>
+          <div class="toolbar-right">
+            <input class="filter-input" id="shelfFilter" type="search" placeholder="筛选书名…" aria-label="筛选书名">
+            <button class="selectbtn" id="sortBtn"><svg class="ico sm"><use href="#i-filter"/></svg><span>最近更新</span><svg class="ico sm"><use href="#i-chev-d"/></svg></button>
+            <button class="iconbtn" id="viewBtn" aria-label="切换视图" title="切换视图"><svg class="ico"><use href="#i-grid"/></svg></button>
+          </div>
+        </div>
+
+        <div class="books" id="bookGrid">
+          <article class="book" data-state="reading" data-title="无职转生 ～到了异世界就拿出真本事～" data-progress="28" data-updated="20261024">
+            <div class="book-cover">
+              <a class="cover-link" href="#" data-go="detail"><img src="../data/covers/12.jpg" alt=""></a>
+              <button class="book-quick" data-go="reader">继续阅读</button>
+              <button class="book-menu" data-menu aria-label="更多操作"><svg class="ico sm"><use href="#i-more"/></svg></button>
+            </div>
+            <div class="book-body">
+              <h3 class="book-title"><a href="#" data-go="detail">无职转生 ～到了异世界就拿出真本事～</a></h3>
+              <p class="book-meta">理不尽な孙の手 · 角川文库</p>
+              <div class="book-foot"><span class="dot amber"></span><div class="progress"><i style="width:28%"></i></div><span class="book-pct">28%</span></div>
+            </div>
+          </article>
+
+          <article class="book" data-state="reading" data-title="欢迎来到实力至上主义的教室" data-progress="52" data-updated="20261023">
+            <div class="book-cover">
+              <a class="cover-link" href="#" data-go="detail"><img src="../data/covers/14.jpg" alt=""></a>
+              <button class="book-quick" data-go="reader">继续阅读</button>
+              <button class="book-menu" data-menu aria-label="更多操作"><svg class="ico sm"><use href="#i-more"/></svg></button>
+            </div>
+            <div class="book-body">
+              <h3 class="book-title"><a href="#" data-go="detail">欢迎来到实力至上主义的教室</a></h3>
+              <p class="book-meta">衣笠彰梧 · MF文库J</p>
+              <div class="book-foot"><span class="dot amber"></span><div class="progress"><i style="width:52%"></i></div><span class="book-pct">52%</span></div>
+            </div>
+          </article>
+
+          <article class="book" data-state="online" data-title="安达与岛村" data-progress="0" data-updated="20261022">
+            <div class="book-cover">
+              <a class="cover-link" href="#" data-go="detail">
+                <span class="cover-fallback"><b>安岛</b><span>ADACHI &amp; SHIMAMURA</span></span>
+              </a>
+              <button class="book-quick" data-go="reader">开始阅读</button>
+              <button class="book-menu" data-menu aria-label="更多操作"><svg class="ico sm"><use href="#i-more"/></svg></button>
+            </div>
+            <div class="book-body">
+              <h3 class="book-title"><a href="#" data-go="detail">安达与岛村</a></h3>
+              <p class="book-meta">入间人间 · 电击文库</p>
+              <div class="book-foot"><span class="dot blue"></span><span class="book-state">在线读 · 208 章</span></div>
+            </div>
+          </article>
+
+          <article class="book" data-state="reading" data-title="妹妹人生" data-progress="36" data-updated="20261021">
+            <div class="book-cover">
+              <a class="cover-link" href="#" data-go="detail"><img src="../data/covers/11.jpg" alt=""></a>
+              <button class="book-quick" data-go="reader">继续阅读</button>
+              <button class="book-menu" data-menu aria-label="更多操作"><svg class="ico sm"><use href="#i-more"/></svg></button>
+            </div>
+            <div class="book-body">
+              <h3 class="book-title"><a href="#" data-go="detail">妹妹人生</a></h3>
+              <p class="book-meta">入间人间 · 电击文库</p>
+              <div class="book-foot"><span class="dot amber"></span><div class="progress"><i style="width:36%"></i></div><span class="book-pct">36%</span></div>
+            </div>
+          </article>
+
+          <article class="book" data-state="done" data-title="帮我找尾巴！" data-progress="100" data-updated="20261020">
+            <div class="book-cover">
+              <a class="cover-link" href="#" data-go="detail"><img src="../data/covers/6.jpg" alt=""></a>
+              <button class="book-quick" data-go="reader">重新阅读</button>
+              <button class="book-menu" data-menu aria-label="更多操作"><svg class="ico sm"><use href="#i-more"/></svg></button>
+            </div>
+            <div class="book-body">
+              <h3 class="book-title"><a href="#" data-go="detail">帮我找尾巴！</a></h3>
+              <p class="book-meta">강명운 · 韩国轻小说</p>
+              <div class="book-foot"><span class="dot jade"></span><span class="book-state">已下载 · 3 卷</span></div>
+            </div>
+          </article>
+
+          <article class="book" data-state="online" data-title="祖师爷今天也依旧是一条咸鱼" data-progress="0" data-updated="20261018">
+            <div class="book-cover">
+              <a class="cover-link" href="#" data-go="detail"><img src="../data/covers/9.webp" alt=""></a>
+              <button class="book-quick" data-go="reader">开始阅读</button>
+              <button class="book-menu" data-menu aria-label="更多操作"><svg class="ico sm"><use href="#i-more"/></svg></button>
+            </div>
+            <div class="book-body">
+              <h3 class="book-title"><a href="#" data-go="detail">祖师爷今天也依旧是一条咸鱼</a></h3>
+              <p class="book-meta">月之咲夜空 · 轻小说</p>
+              <div class="book-foot"><span class="dot blue"></span><span class="book-state">在线读 · 96 章</span></div>
+            </div>
+          </article>
+
+          <article class="book" data-state="reading" data-title="妹妹是不能当女友的，可是……" data-progress="62" data-updated="20261016">
+            <div class="book-cover">
+              <a class="cover-link" href="#" data-go="detail">
+                <span class="cover-fallback"><b>妹妹</b><span>CAN'T BE GIRLFRIEND</span></span>
+              </a>
+              <button class="book-quick" data-go="reader">继续阅读</button>
+              <button class="book-menu" data-menu aria-label="更多操作"><svg class="ico sm"><use href="#i-more"/></svg></button>
+            </div>
+            <div class="book-body">
+              <h3 class="book-title"><a href="#" data-go="detail">妹妹是不能当女友的，可是……</a></h3>
+              <p class="book-meta">镜游 · 电击文库</p>
+              <div class="book-foot"><span class="dot amber"></span><div class="progress"><i style="width:62%"></i></div><span class="book-pct">62%</span></div>
+            </div>
+          </article>
+
+          <article class="book" data-state="reading" data-title="我买下了与她的每周密会" data-progress="45" data-updated="20261014">
+            <div class="book-cover">
+              <a class="cover-link" href="#" data-go="detail">
+                <span class="cover-fallback"><b>密会</b><span>WEEKLY MEETING</span></span>
+              </a>
+              <button class="book-quick" data-go="reader">继续阅读</button>
+              <button class="book-menu" data-menu aria-label="更多操作"><svg class="ico sm"><use href="#i-more"/></svg></button>
+            </div>
+            <div class="book-body">
+              <h3 class="book-title"><a href="#" data-go="detail">我买下了与她的每周密会</a></h3>
+              <p class="book-meta">羽田宇佐 · 富士见文库</p>
+              <div class="book-foot"><span class="dot amber"></span><div class="progress"><i style="width:45%"></i></div><span class="book-pct">45%</span></div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- ==================== 书籍详情 ==================== -->
+      <section class="view" data-view="detail">
+        <a class="backlink" href="#" data-go="shelf"><svg class="ico sm"><use href="#i-arrow-l"/></svg>书架 / 全部藏书</a>
+
+        <div class="detail-hero">
+          <div class="hero-wash" style="background-image:url(../data/covers/12.jpg)"></div>
+          <div class="detail-cover"><img src="../data/covers/12.jpg" alt=""></div>
+          <div class="detail-info">
+            <div class="detail-kicker">
+              <span>角川文库</span><i class="sep"></i><span>连载中</span><i class="sep"></i>
+              <span class="tag amber"><span class="dot amber"></span>部分下载 · 28%</span>
+            </div>
+            <h1 class="detail-title">无职转生</h1>
+            <p class="detail-sub">～到了异世界就拿出真本事～</p>
+            <p class="detail-author">理不尽な孙の手 著 · シロタカ 插画</p>
+            <div class="detail-stats">
+              <div class="stat"><b>26</b><span>卷</span></div>
+              <div class="stat"><b>286</b><span>章</span></div>
+              <div class="stat"><b>148.6</b><span>万字</span></div>
+              <div class="stat"><b>28%</b><span>阅读进度</span></div>
+            </div>
+            <p class="detail-desc" id="detailDesc">三十四岁、一事无成的男人在车祸中死去，醒来时却成了一个婴儿。他带着前世的记忆，决定这一次要认真地活。从故乡的村庄到迷宫都市，他学剑、学魔法，遇见许多人，也欠下许多债。这是一个笨拙的男人重新学习如何成为家人的故事。</p>
+            <button class="desc-toggle" id="descToggle">展开简介</button>
+            <div class="detail-actions">
+              <button class="btn btn-accent btn-lg" data-go="reader"><svg class="ico"><use href="#i-book-open"/></svg>继续阅读 · 第 7 卷第 2 章</button>
+              <button class="btn btn-ghost btn-lg"><svg class="ico"><use href="#i-list"/></svg>目录</button>
+              <button class="btn btn-ghost btn-lg" data-menu aria-label="更多操作"><svg class="ico"><use href="#i-more"/></svg></button>
+            </div>
+          </div>
+        </div>
+
+        <div class="progress-card">
+          <div class="pc-icon"><svg class="ico"><use href="#i-bookmark"/></svg></div>
+          <div class="pc-body">
+            <div class="pc-kicker">上次读到</div>
+            <div class="pc-title">第 7 卷 · 第 2 章　街角的相遇</div>
+            <div class="progress"><i style="width:28%"></i></div>
+          </div>
+          <div class="pc-right">
+            <span class="pc-pct">28<span style="font-size:11px">%</span></span>
+            <button class="btn" data-go="reader">继续</button>
+          </div>
+        </div>
+
+        <div class="vol-head">
+          <h3>第 7 卷 · 少年期 迷宫都市</h3>
+          <span class="tag">12 章</span>
+          <i class="line"></i>
+          <button class="fold" aria-label="折叠"><svg class="ico sm"><use href="#i-chev-d"/></svg></button>
+        </div>
+        <div class="chapters">
+          <a class="ch" href="#" data-go="reader"><span class="num">01</span><span class="name">石板路的午后</span></a>
+          <a class="ch on" href="#" data-go="reader"><span class="num">02</span><span class="name">街角的相遇</span><span class="tag accent">在读</span></a>
+          <a class="ch" href="#" data-go="reader"><span class="num">03</span><span class="name">委托与报酬</span></a>
+          <a class="ch" href="#" data-go="reader"><span class="num">04</span><span class="name">巷口的少女</span></a>
+          <a class="ch" href="#" data-go="reader"><span class="num">05</span><span class="name">雨后的集市</span></a>
+          <a class="ch" href="#" data-go="reader"><span class="num">06</span><span class="name">一封家书</span></a>
+          <a class="ch" href="#" data-go="reader"><span class="num">07</span><span class="name">魔法的代价</span></a>
+          <a class="ch" href="#" data-go="reader"><span class="num">08</span><span class="name">分别的前夜</span></a>
+          <a class="ch missing" href="#" data-go="reader"><span class="num">09</span><span class="name">未命名的章节</span><span class="tag">未抓取</span></a>
+          <a class="ch missing" href="#" data-go="reader"><span class="num">10</span><span class="name">未命名的章节</span><span class="tag">未抓取</span></a>
+          <a class="ch missing" href="#" data-go="reader"><span class="num">11</span><span class="name">未命名的章节</span><span class="tag">未抓取</span></a>
+          <a class="ch missing" href="#" data-go="reader"><span class="num">12</span><span class="name">未命名的章节</span><span class="tag">未抓取</span></a>
+        </div>
+
+        <div class="vol-head">
+          <h3>第 8 卷 · 归乡</h3>
+          <span class="tag">10 章</span>
+          <i class="line"></i>
+          <button class="fold" aria-label="折叠"><svg class="ico sm"><use href="#i-chev-d"/></svg></button>
+        </div>
+        <div class="chapters">
+          <a class="ch" href="#" data-go="reader"><span class="num">01</span><span class="name">北方的路</span></a>
+          <a class="ch" href="#" data-go="reader"><span class="num">02</span><span class="name">故乡的雪</span></a>
+          <a class="ch" href="#" data-go="reader"><span class="num">03</span><span class="name">旧宅</span></a>
+          <a class="ch" href="#" data-go="reader"><span class="num">04</span><span class="name">母亲的信</span></a>
+          <a class="ch" href="#" data-go="reader"><span class="num">05</span><span class="name">重逢</span></a>
+          <a class="ch" href="#" data-go="reader"><span class="num">06</span><span class="name">无法挽回的事</span></a>
+          <a class="ch" href="#" data-go="reader"><span class="num">07</span><span class="name">雪停之后</span></a>
+          <a class="ch" href="#" data-go="reader"><span class="num">08</span><span class="name">新的家人</span></a>
+          <a class="ch" href="#" data-go="reader"><span class="num">09</span><span class="name">启程</span></a>
+          <a class="ch" href="#" data-go="reader"><span class="num">10</span><span class="name">后记</span></a>
+        </div>
+      </section>
+
+      <!-- ==================== 阅读器 ==================== -->
+      <section class="view reader-view" data-view="reader">
+        <div class="reader-line" id="readerLine"></div>
+        <div class="reader-top" id="readerTop">
+          <button class="iconbtn" data-go="detail" aria-label="返回目录"><svg class="ico"><use href="#i-arrow-l"/></svg></button>
+          <div class="rt-info">
+            <span class="rt-book">无职转生 ～到了异世界就拿出真本事～</span>
+            <span class="rt-ch">第 7 卷 · 第 2 章　街角的相遇</span>
+          </div>
+          <span class="rt-pct" id="rtPct">34%</span>
+          <button class="iconbtn" data-open="toc" aria-label="目录"><svg class="ico"><use href="#i-list"/></svg></button>
+          <button class="iconbtn" data-open="settings" aria-label="阅读设置"><svg class="ico"><use href="#i-type"/></svg></button>
+          <button class="iconbtn" id="bookmarkBtn" aria-label="书签"><svg class="ico"><use href="#i-bookmark"/></svg></button>
+        </div>
+
+        <article class="reader-body" id="readerBody">
+          <div class="chapter-eyebrow">第 7 卷 · 少年期 迷宫都市</div>
+          <h1 class="chapter-title">街角的相遇</h1>
+          <div class="chapter-meta">
+            <span>3,120 字</span><span>·</span><span>约 9 分钟</span><span>·</span><span>2026-10-23</span>
+          </div>
+
+          <div class="prose" id="prose">
+            <p>迷宫都市的午后，总是从石板路上的水汽开始。</p>
+            <p>昨夜下过雨，屋檐还在滴水。我背着委托用的皮包，沿着主街往冒险者公会走，鞋底踩过水洼，溅起细小的泥点。</p>
+            <p>这座城市大得离谱。转一个弯，香料铺的气味就会盖过面包房；再转一个弯，又能听见铁匠铺的锤声。我来了三个月，仍然会在巷子里迷路。</p>
+            <p>今天也不例外。</p>
+            <p>我停在一个从未见过的路口。左边是卖魔石的小摊，右边是一段向下的石阶。石阶尽头有光，像是通往另一条街。我犹豫了几秒，还是走了下去。</p>
+            <div class="illust"><div class="ph">插图 · 迷宫都市的街角</div></div>
+            <p>光是从一间旧书店里透出来的。门半掩着，门框上挂着一块褪色的木牌，写着我看不懂的古文字。我推门进去，铃铛响了一声。</p>
+            <p>店里很窄，书从地面堆到天花板。最里面的柜台后面坐着一个女孩。她抬起头，灰色的眼睛在昏暗里显得很安静。</p>
+            <p>“找什么？”她问。</p>
+            <p>“……随便看看。”</p>
+            <p>她看了我一会儿，忽然从柜台下抽出一本薄薄的书，推到我面前。封面上没有标题，只有一枚小小的、像是手绘的徽记。</p>
+            <p>“这本适合你。”她说，“第一次来的人，都应该先读这本。”</p>
+            <p>我翻开第一页。纸上只有一句话：“如果你读到这里，说明你已经迷路了。”</p>
+            <p>我抬起头。她已经低下头，继续整理手里的书，仿佛刚才那句话不是她说的。</p>
+            <p>窗外的光慢慢偏了。我在那家书店里站了很久，最后买下了那本没有标题的书。走出门的时候，我回头看了一眼，木牌上的古文字似乎亮了一下。</p>
+            <p>后来我才知道，那条街并不在地图上。</p>
+          </div>
+
+          <div class="chapter-end">
+            <div class="fin">— 本章完 —</div>
+            <div class="chapter-nav">
+              <button class="btn btn-ghost" data-toast="已切换到上一章（原型）"><svg class="ico sm"><use href="#i-arrow-l"/></svg>上一章</button>
+              <button class="btn btn-accent" data-go="reader">下一章<svg class="ico sm"><use href="#i-arrow-r"/></svg></button>
+            </div>
+          </div>
+        </article>
+
+        <div class="reader-dock" id="readerDock">
+          <button class="dock-btn" aria-label="上一章" data-toast="已切换到上一章（原型）"><svg class="ico"><use href="#i-arrow-l"/></svg><span>上一章</span></button>
+          <span class="dock-page">2 / 12</span>
+          <button class="dock-btn primary" data-go="reader"><span>下一章</span><svg class="ico"><use href="#i-arrow-r"/></svg></button>
+          <span class="dock-sep"></span>
+          <button class="dock-btn" data-open="toc" aria-label="目录"><svg class="ico"><use href="#i-list"/></svg></button>
+          <button class="dock-btn" data-open="settings" aria-label="设置"><svg class="ico"><use href="#i-type"/></svg></button>
+        </div>
+      </section>
+
+      <!-- ==================== 历史 ==================== -->
+      <section class="view" data-view="history">
+        <div class="page-head">
+          <div>
+            <div class="eyebrow">Reading log</div>
+            <h1 class="page-title">历史</h1>
+            <p class="page-sub">共 42 条 · 小说 28 · 漫画 9 · 动漫 5</p>
+          </div>
+          <div class="page-head-actions">
+            <button class="btn btn-ghost" data-confirm="清空全部阅读历史？">清空历史</button>
+          </div>
+        </div>
+
+        <div class="tabs" id="histTabs">
+          <button class="on" data-kind="all">全部 <span class="n">42</span></button>
+          <button data-kind="novel">小说 <span class="n">28</span></button>
+          <button data-kind="comic">漫画 <span class="n">9</span></button>
+          <button data-kind="anime">动漫 <span class="n">5</span></button>
+        </div>
+
+        <div class="day-group" data-group>
+          <div class="day-head"><h3>今天</h3><i class="line"></i><span class="n">3 条</span></div>
+
+          <article class="hist" data-kind="novel">
+            <div class="hist-cover"><img src="../data/covers/12.jpg" alt=""></div>
+            <div class="hist-body">
+              <div class="hist-title"><a href="#" data-go="detail">无职转生 ～到了异世界就拿出真本事～</a><span class="tag">小说</span></div>
+              <p class="hist-meta">读到 <b>第 7 卷 · 第 2 章　街角的相遇</b> · 角川文库</p>
+            </div>
+            <span class="hist-time">22:14</span>
+            <div class="hist-actions"><button class="btn btn-sm" data-go="reader">继续</button><button class="iconbtn" data-toast="已从历史移除" aria-label="移除"><svg class="ico sm"><use href="#i-x"/></svg></button></div>
+          </article>
+
+          <article class="hist" data-kind="novel">
+            <div class="hist-cover"><img src="../data/covers/11.jpg" alt=""></div>
+            <div class="hist-body">
+              <div class="hist-title"><a href="#" data-go="detail">妹妹人生</a><span class="tag">小说</span></div>
+              <p class="hist-meta">读到 <b>上卷 · 第 3 章　夏天的房间</b> · 电击文库</p>
+            </div>
+            <span class="hist-time">20:02</span>
+            <div class="hist-actions"><button class="btn btn-sm" data-go="reader">继续</button><button class="iconbtn" data-toast="已从历史移除" aria-label="移除"><svg class="ico sm"><use href="#i-x"/></svg></button></div>
+          </article>
+
+          <article class="hist" data-kind="comic">
+            <div class="hist-cover"><span class="cover-fallback"><b>安岛</b></span></div>
+            <div class="hist-body">
+              <div class="hist-title"><a href="#" data-go="comics">安达与岛村（漫画）</a><span class="tag">漫画</span></div>
+              <p class="hist-meta">读到 <b>第 41 话</b> · 拷贝漫画</p>
+            </div>
+            <span class="hist-time">18:37</span>
+            <div class="hist-actions"><button class="btn btn-sm" data-go="comics">继续</button><button class="iconbtn" data-toast="已从历史移除" aria-label="移除"><svg class="ico sm"><use href="#i-x"/></svg></button></div>
+          </article>
+        </div>
+
+        <div class="day-group" data-group>
+          <div class="day-head"><h3>昨天</h3><i class="line"></i><span class="n">2 条</span></div>
+
+          <article class="hist" data-kind="novel">
+            <div class="hist-cover"><img src="../data/covers/14.jpg" alt=""></div>
+            <div class="hist-body">
+              <div class="hist-title"><a href="#" data-go="detail">欢迎来到实力至上主义的教室</a><span class="tag">小说</span></div>
+              <p class="hist-meta">读到 <b>第 11 卷 · 第 5 章　文化祭前夜</b> · MF文库J</p>
+            </div>
+            <span class="hist-time">昨天 23:48</span>
+            <div class="hist-actions"><button class="btn btn-sm" data-go="reader">继续</button><button class="iconbtn" data-toast="已从历史移除" aria-label="移除"><svg class="ico sm"><use href="#i-x"/></svg></button></div>
+          </article>
+
+          <article class="hist" data-kind="anime">
+            <div class="hist-cover"><span class="cover-fallback"><b>巨人</b></span></div>
+            <div class="hist-body">
+              <div class="hist-title"><a href="#" data-go="anime">进击的巨人</a><span class="tag">动漫</span></div>
+              <p class="hist-meta">看到 <b>第 3 季 · 第 12 集</b> · 樱花动漫</p>
+            </div>
+            <span class="hist-time">昨天 21:05</span>
+            <div class="hist-actions"><button class="btn btn-sm" data-go="anime">继续</button><button class="iconbtn" data-toast="已从历史移除" aria-label="移除"><svg class="ico sm"><use href="#i-x"/></svg></button></div>
+          </article>
+        </div>
+
+        <div class="day-group" data-group>
+          <div class="day-head"><h3>更早</h3><i class="line"></i><span class="n">37 条</span></div>
+          <article class="hist" data-kind="novel">
+            <div class="hist-cover"><span class="cover-fallback"><b>妹妹</b></span></div>
+            <div class="hist-body">
+              <div class="hist-title"><a href="#" data-go="detail">妹妹是不能当女友的，可是……</a><span class="tag">小说</span></div>
+              <p class="hist-meta">读到 <b>第 3 卷 · 第 4 章　雨停之后</b> · 电击文库</p>
+            </div>
+            <span class="hist-time">10-19 22:30</span>
+            <div class="hist-actions"><button class="btn btn-sm" data-go="reader">继续</button><button class="iconbtn" data-toast="已从历史移除" aria-label="移除"><svg class="ico sm"><use href="#i-x"/></svg></button></div>
+          </article>
+        </div>
+      </section>
+
+      <!-- ==================== 搜索 / 发现 ==================== -->
+      <section class="view" data-view="search">
+        <div class="search-hero">
+          <div class="eyebrow">Search</div>
+          <h1>找一本书，或者一段话</h1>
+          <div class="bigsearch">
+            <svg class="ico"><use href="#i-search"/></svg>
+            <input id="bigSearch" type="search" value="妹妹" aria-label="搜索">
+            <button class="btn btn-accent">搜索</button>
+          </div>
+          <div class="search-hint">
+            <span><kbd>⌘</kbd><kbd>K</kbd> 随时唤起</span>
+            <span>支持书名、作者、章节名、正文全文</span>
+            <span>共 8 个在线源</span>
+          </div>
+        </div>
+
+        <div class="tabs" style="margin-top:22px">
+          <button class="on">本地书库 <span class="n">3</span></button>
+          <button>在线书源 <span class="n">128</span></button>
+          <button>作者 <span class="n">2</span></button>
+        </div>
+
+        <div class="section-head"><h2>本地命中</h2><span class="count">3 条 · 0.02 秒</span><a class="more" href="#">查看全部<svg class="ico sm"><use href="#i-chev-r"/></svg></a></div>
+
+        <div class="hit">
+          <div class="hit-cover"><span class="cover-fallback"><b>妹妹</b></span></div>
+          <div class="hit-body">
+            <a class="hit-title" href="#" data-go="detail">妹妹是不能当女友的，可是……</a>
+            <div class="hit-sub"><span>镜游</span><span>·</span><span>电击文库</span><span>·</span><span class="src-chip">本地 · 62%</span></div>
+            <p class="hit-snip">……她会在清晨把早餐放在桌上，也会在深夜敲开我的房门，用一句“睡不着”把<mark>妹妹</mark>与恋人之间那条线，又往前推了一寸。</p>
+          </div>
+          <div class="hit-actions"><button class="btn btn-sm" data-go="reader">继续读</button></div>
+        </div>
+
+        <div class="hit">
+          <div class="hit-cover"><img src="../data/covers/11.jpg" alt=""></div>
+          <div class="hit-body">
+            <a class="hit-title" href="#" data-go="detail">妹妹人生</a>
+            <div class="hit-sub"><span>入间人间</span><span>·</span><span>电击文库</span><span>·</span><span class="src-chip">本地 · 已下载</span></div>
+            <p class="hit-snip">我和<mark>妹妹</mark>相依为命地长大。她是我唯一的家人，也是我唯一不敢直视的人。</p>
+          </div>
+          <div class="hit-actions"><button class="btn btn-sm" data-go="reader">继续读</button></div>
+        </div>
+
+        <div class="hit">
+          <div class="hit-cover"><span class="cover-fallback"><b>异种</b></span></div>
+          <div class="hit-body">
+            <a class="hit-title" href="#" data-go="detail">不相容的异种族妻子们</a>
+            <div class="hit-sub"><span>이만두</span><span>·</span><span>连载中</span><span>·</span><span class="src-chip">本地 · 12%</span></div>
+            <p class="hit-snip">“你的<mark>妹妹</mark>，以后也会成为我的家人吧？”她歪着头，语气认真得让人无法反驳。</p>
+          </div>
+          <div class="hit-actions"><button class="btn btn-sm" data-go="reader">继续读</button></div>
+        </div>
+
+        <div class="section-head"><h2>在线书源</h2><span class="count">来自 8 个源 · 128 条</span></div>
+
+        <div class="hit">
+          <div class="hit-cover"><span class="cover-fallback"><b>妹</b></span></div>
+          <div class="hit-body">
+            <a class="hit-title" href="#">关于妹妹的一切</a>
+            <div class="hit-sub"><span>匿名</span><span>·</span><span class="src-chip">linovelib</span><span>·</span><span>共 86 章</span></div>
+            <p class="hit-snip">简介暂缺。点击右侧“加入书架”可先建目录，再按需抓取正文。</p>
+          </div>
+          <div class="hit-actions"><button class="btn btn-sm btn-accent" data-toast="已加入书架（原型）">加入书架</button></div>
+        </div>
+
+        <div class="hit">
+          <div class="hit-cover"><span class="cover-fallback"><b>雨</b></span></div>
+          <div class="hit-body">
+            <a class="hit-title" href="#">雨天的妹妹</a>
+            <div class="hit-sub"><span>佐藤某某</span><span>·</span><span class="src-chip">linovel</span><span>·</span><span>共 42 章</span></div>
+            <p class="hit-snip">一部关于雨天、屋檐与两个人的短篇集。</p>
+          </div>
+          <div class="hit-actions"><button class="btn btn-sm btn-accent" data-toast="已加入书架（原型）">加入书架</button></div>
+        </div>
+
+        <div class="hit">
+          <div class="hit-cover"><span class="cover-fallback"><b>夏</b></span></div>
+          <div class="hit-body">
+            <a class="hit-title" href="#">妹妹的夏天结束了</a>
+            <div class="hit-sub"><span>未署名</span><span>·</span><span class="src-chip">bilinovel</span><span>·</span><span>共 31 章</span></div>
+            <p class="hit-snip">那年夏天，她第一次没有叫我哥哥。</p>
+          </div>
+          <div class="hit-actions"><button class="btn btn-sm btn-accent" data-toast="已加入书架（原型）">加入书架</button></div>
+        </div>
+      </section>
+
+      <!-- ==================== 书源 ==================== -->
+      <section class="view" data-view="sources">
+        <div class="page-head">
+          <div>
+            <div class="eyebrow">Sources</div>
+            <h1 class="page-title">书源</h1>
+            <p class="page-sub">8 个源 · 最近检测 2 分钟前</p>
+          </div>
+          <div class="page-head-actions">
+            <button class="btn btn-ghost" data-toast="已开始批量检测（原型）"><svg class="ico"><use href="#i-refresh"/></svg>全部重测</button>
+            <button class="btn btn-accent" data-go="crawl"><svg class="ico"><use href="#i-plus"/></svg>添加书源</button>
+          </div>
+        </div>
+
+        <div class="stat-cards">
+          <div class="stat-card accent"><div class="k">可用</div><div class="v">7</div><div class="n">个源响应正常</div></div>
+          <div class="stat-card"><div class="k">异常</div><div class="v" style="color:var(--danger)">1</div><div class="n">漫画柜 · 403</div></div>
+          <div class="stat-card"><div class="k">平均延迟</div><div class="v">0.8<span style="font-size:13px">s</span></div><div class="n">较昨日 +0.1s</div></div>
+          <div class="stat-card"><div class="k">今日抓取</div><div class="v">126</div><div class="n">章 · 全部成功</div></div>
+        </div>
+
+        <div class="table-wrap">
+          <table class="src">
+            <thead><tr><th>书源</th><th>类型</th><th>状态</th><th>延迟</th><th>最近检测</th><th style="text-align:right">启用</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><div class="src-name"><span class="dot jade"></span>哔哩轻小说</div><div class="src-type">linovelib</div></td>
+                <td>小说</td><td><span class="tag jade">正常</span></td><td class="mono">0.42s</td><td class="muted">2 分钟前</td>
+                <td><div class="src-actions"><button class="btn btn-sm btn-ghost" data-toast="正在重测…">重测</button><label class="switch"><input type="checkbox" checked aria-label="启用哔哩轻小说"><i></i></label></div></td>
+              </tr>
+              <tr>
+                <td><div class="src-name"><span class="dot jade"></span>轻小说文库</div><div class="src-type">linovel</div></td>
+                <td>小说</td><td><span class="tag jade">正常</span></td><td class="mono">0.61s</td><td class="muted">2 分钟前</td>
+                <td><div class="src-actions"><button class="btn btn-sm btn-ghost" data-toast="正在重测…">重测</button><label class="switch"><input type="checkbox" checked aria-label="启用轻小说文库"><i></i></label></div></td>
+              </tr>
+              <tr>
+                <td><div class="src-name"><span class="dot jade"></span>拷贝漫画</div><div class="src-type">mangacopy</div></td>
+                <td>漫画</td><td><span class="tag jade">正常</span></td><td class="mono">1.10s</td><td class="muted">3 分钟前</td>
+                <td><div class="src-actions"><button class="btn btn-sm btn-ghost" data-toast="正在重测…">重测</button><label class="switch"><input type="checkbox" checked aria-label="启用拷贝漫画"><i></i></label></div></td>
+              </tr>
+              <tr class="bad">
+                <td><div class="src-name"><span class="dot amber"></span>漫画柜</div><div class="src-type">manhuagui</div></td>
+                <td>漫画</td><td><span class="tag amber">403 · 建议关掉</span></td><td class="mono">—</td><td class="muted">5 分钟前</td>
+                <td><div class="src-actions"><button class="btn btn-sm btn-ghost" data-toast="正在重测…">重测</button><label class="switch"><input type="checkbox" aria-label="启用漫画柜"><i></i></label></div></td>
+              </tr>
+              <tr>
+                <td><div class="src-name"><span class="dot jade"></span>樱花动漫</div><div class="src-type">anime</div></td>
+                <td>动漫</td><td><span class="tag jade">正常</span></td><td class="mono">0.88s</td><td class="muted">8 分钟前</td>
+                <td><div class="src-actions"><button class="btn btn-sm btn-ghost" data-toast="正在重测…">重测</button><label class="switch"><input type="checkbox" checked aria-label="启用樱花动漫"><i></i></label></div></td>
+              </tr>
+              <tr>
+                <td><div class="src-name"><span class="dot jade"></span>轻之国度</div><div class="src-type">lightnovel</div></td>
+                <td>小说</td><td><span class="tag jade">正常</span></td><td class="mono">0.55s</td><td class="muted">12 分钟前</td>
+                <td><div class="src-actions"><button class="btn btn-sm btn-ghost" data-toast="正在重测…">重测</button><label class="switch"><input type="checkbox" checked aria-label="启用轻之国度"><i></i></label></div></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ==================== 设计规范 ==================== -->
+      <section class="view" data-view="design">
+        <div class="page-head">
+          <div>
+            <div class="eyebrow">Design system</div>
+            <h1 class="page-title">设计规范</h1>
+            <p class="page-sub">纸上书房 · Paper Study ／ v1.0</p>
+          </div>
+        </div>
+
+        <div class="ds-section">
+          <h2>色彩</h2>
+          <p>四套主题共用语义变量。背景 60%、表面 30%、墨色 8%、强调色不超过 2%。</p>
+          <div class="swatches">
+            <div class="swatch"><div class="chip" style="background:#f6f2e9"></div><div class="meta"><b>纸 · 背景</b>#F6F2E9</div></div>
+            <div class="swatch"><div class="chip" style="background:#fffdf8"></div><div class="meta"><b>表面</b>#FFFDF8</div></div>
+            <div class="swatch"><div class="chip" style="background:#1f1c18"></div><div class="meta"><b>墨</b>#1F1C18</div></div>
+            <div class="swatch"><div class="chip" style="background:#b0442d"></div><div class="meta"><b>朱砂 · 强调</b>#B0442D</div></div>
+            <div class="swatch"><div class="chip" style="background:#f4e3da"></div><div class="meta"><b>朱砂淡</b>#F4E3DA</div></div>
+            <div class="swatch"><div class="chip" style="background:#3c6e57"></div><div class="meta"><b>青 · 完整</b>#3C6E57</div></div>
+            <div class="swatch"><div class="chip" style="background:#9a7638"></div><div class="meta"><b>琥珀 · 部分</b>#9A7638</div></div>
+            <div class="swatch"><div class="chip" style="background:#3a6480"></div><div class="meta"><b>靛 · 在线</b>#3A6480</div></div>
+          </div>
+        </div>
+
+        <div class="ds-section">
+          <h2>字体</h2>
+          <p>标题与正文用衬线，界面与元信息用无衬线。正文 19px / 1.95，首行缩进 2em。</p>
+          <div class="type-row"><span class="spec">Display / 32 / 600</span><span class="demo" style="font-size:32px;font-weight:600">无职转生</span></div>
+          <div class="type-row"><span class="spec">H1 / 26 / 600</span><span class="demo" style="font-size:26px;font-weight:600">街角的相遇</span></div>
+          <div class="type-row"><span class="spec">H3 / 16 / 600</span><span class="demo" style="font-size:16px;font-weight:600">第 7 卷 · 少年期 迷宫都市</span></div>
+          <div class="type-row"><span class="spec">Body / 14 / 400</span><span style="font-size:14px">界面正文：12 本藏书 · 2,726 章 · 已下载 6 本</span></div>
+          <div class="type-row"><span class="spec">Meta / 12 / 400</span><span style="font-size:12px;color:var(--muted)">镜游 · 电击文库 · 62%</span></div>
+          <div class="type-row"><span class="spec">Reading / 19 / 1.95</span><span class="demo" style="font-size:19px;line-height:1.95">迷宫都市的午后，总是从石板路上的水汽开始。</span></div>
+        </div>
+
+        <div class="ds-section">
+          <h2>组件</h2>
+          <p>一个页面只允许一个主按钮；破坏性操作必须二次确认。</p>
+          <div class="comp-row">
+            <button class="btn btn-accent">继续阅读</button>
+            <button class="btn">主要按钮</button>
+            <button class="btn btn-ghost">次要按钮</button>
+            <button class="btn btn-quiet">幽灵按钮</button>
+            <button class="btn btn-danger">删除</button>
+            <button class="iconbtn"><svg class="ico"><use href="#i-more"/></svg></button>
+          </div>
+          <div class="comp-row">
+            <span class="tag jade"><span class="dot jade"></span>已下载</span>
+            <span class="tag amber"><span class="dot amber"></span>部分</span>
+            <span class="tag blue"><span class="dot blue"></span>在线读</span>
+            <span class="tag">未抓取</span>
+            <span class="tag accent">在读</span>
+          </div>
+          <div class="comp-row" style="max-width:420px">
+            <div class="seg"><button class="on">全部</button><button>在读</button><button>已下载</button><button>在线</button></div>
+            <label class="switch"><input type="checkbox" checked aria-label="示例开关"><i></i></label>
+          </div>
+          <div class="comp-row" style="max-width:360px">
+            <div class="progress" style="flex:1"><i style="width:62%"></i></div>
+            <span class="book-pct">62%</span>
+          </div>
+        </div>
+
+        <div class="ds-section">
+          <h2>间距与圆角</h2>
+          <p>4px 基准。卡片 14，面板 20，胶囊 999。</p>
+          <div class="spacing">
+            <div style="width:4px;height:16px"></div><div style="width:8px;height:22px"></div><div style="width:12px;height:28px"></div><div style="width:16px;height:34px"></div><div style="width:24px;height:40px"></div><div style="width:32px;height:46px"></div><div style="width:40px;height:52px"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== 占位页 ==================== -->
+      <section class="view" data-view="placeholder">
+        <div class="empty" style="margin-top:40px">
+          <p class="big" id="phTitle">漫画</p>
+          <p id="phDesc">这个页面在完整原型中沿用同一套外壳与卡片规范。</p>
+          <div class="actions"><button class="btn btn-ghost" data-go="shelf">回书架</button><button class="btn btn-accent" data-go="design">看设计规范</button></div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- ============ Mobile tabbar ============ -->
+<nav class="tabbar" aria-label="底部导航">
+  <button class="tab on" data-go="shelf"><svg class="ico"><use href="#i-shelf"/></svg>书架</button>
+  <button class="tab" data-go="comics"><svg class="ico"><use href="#i-comic"/></svg>漫画</button>
+  <button class="tab" data-go="anime"><svg class="ico"><use href="#i-play"/></svg>动漫</button>
+  <button class="tab" data-go="history"><svg class="ico"><use href="#i-clock"/></svg>历史</button>
+  <button class="tab" id="moreTab"><svg class="ico"><use href="#i-menu"/></svg>更多</button>
+</nav>
+
+<!-- ============ Overlays ============ -->
+<div class="scrim" id="scrim"></div>
+
+<aside class="drawer" id="tocDrawer" aria-label="目录">
+  <div class="drawer-head">
+    <div style="flex:1">
+      <h3>目录</h3>
+      <div class="sub">无职转生 · 286 章 · 已下载 80</div>
+    </div>
+    <button class="iconbtn" data-close aria-label="关闭"><svg class="ico"><use href="#i-x"/></svg></button>
+  </div>
+  <div class="drawer-body">
+    <div class="toc-search">
+      <svg class="ico sm"><use href="#i-search"/></svg>
+      <input type="search" placeholder="搜索章节…" aria-label="搜索章节">
+    </div>
+    <div class="toc-vol">第 7 卷 · 少年期 迷宫都市</div>
+    <a class="toc-link" href="#" data-go="reader"><span class="num">01</span>石板路的午后</a>
+    <a class="toc-link on" href="#" data-go="reader"><span class="num">02</span>街角的相遇<span class="state">在读</span></a>
+    <a class="toc-link" href="#" data-go="reader"><span class="num">03</span>委托与报酬</a>
+    <a class="toc-link" href="#" data-go="reader"><span class="num">04</span>巷口的少女</a>
+    <a class="toc-link" href="#" data-go="reader"><span class="num">05</span>雨后的集市</a>
+    <a class="toc-link" href="#" data-go="reader"><span class="num">06</span>一封家书</a>
+    <a class="toc-link" href="#" data-go="reader"><span class="num">07</span>魔法的代价</a>
+    <div class="toc-vol">第 8 卷 · 归乡</div>
+    <a class="toc-link" href="#" data-go="reader"><span class="num">01</span>北方的路</a>
+    <a class="toc-link" href="#" data-go="reader"><span class="num">02</span>故乡的雪</a>
+    <a class="toc-link" href="#" data-go="reader"><span class="num">03</span>旧宅<span class="state">未抓取</span></a>
+  </div>
+</aside>
+
+<aside class="drawer right" id="settingsDrawer" aria-label="阅读设置">
+  <div class="drawer-head">
+    <h3>阅读设置</h3>
+    <button class="iconbtn" data-close aria-label="关闭"><svg class="ico"><use href="#i-x"/></svg></button>
+  </div>
+  <div class="drawer-body">
+    <div class="set-group">
+      <div class="set-label">主题</div>
+      <div class="theme-grid">
+        <button class="theme-opt on" data-set-theme="paper"><span class="theme-sw" style="background:#f6f2e9;color:#1f1c18"><i></i><i></i><i></i></span><span>纸<small>默认</small></span></button>
+        <button class="theme-opt" data-set-theme="sepia"><span class="theme-sw" style="background:#f2e7d3;color:#2a2118"><i></i><i></i><i></i></span><span>黄<small>护眼</small></span></button>
+        <button class="theme-opt" data-set-theme="green"><span class="theme-sw" style="background:#e9efe3;color:#202a1d"><i></i><i></i><i></i></span><span>绿<small>护眼</small></span></button>
+        <button class="theme-opt" data-set-theme="night"><span class="theme-sw" style="background:#131519;color:#e9e4d9"><i></i><i></i><i></i></span><span>夜<small>暗色</small></span></button>
+      </div>
+    </div>
+
+    <div class="set-group">
+      <div class="set-label">字号 <b id="fsOut">19 px</b></div>
+      <div class="stepper">
+        <button id="fsMinus" aria-label="减小字号">A−</button>
+        <output>正文大小</output>
+        <button id="fsPlus" aria-label="增大字号">A＋</button>
+      </div>
+    </div>
+
+    <div class="set-group">
+      <div class="set-label">行距 <b id="lhOut">1.95</b></div>
+      <input id="lhRange" type="range" min="160" max="240" step="5" value="195">
+    </div>
+
+    <div class="set-group">
+      <div class="set-label">版心 <b id="measureOut">38 em</b></div>
+      <input id="measureRange" type="range" min="32" max="48" step="1" value="38">
+    </div>
+
+    <div class="set-group">
+      <div class="set-label">字体</div>
+      <div class="seg wide">
+        <button class="on" data-font="serif">宋体</button>
+        <button data-font="sans">黑体</button>
+      </div>
+    </div>
+
+    <div class="set-group">
+      <button class="btn btn-ghost" style="width:100%" id="resetReading">恢复默认</button>
+    </div>
+  </div>
+</aside>
+
+<!-- theme popover -->
+<div class="popover" id="themePop">
+  <div class="po-label">阅读主题</div>
+  <button class="po-item on" data-set-theme="paper"><span class="sw" style="background:#f6f2e9"></span>纸<svg class="ico sm check"><use href="#i-check"/></svg></button>
+  <button class="po-item" data-set-theme="sepia"><span class="sw" style="background:#f2e7d3"></span>黄<svg class="ico sm check"><use href="#i-check"/></svg></button>
+  <button class="po-item" data-set-theme="green"><span class="sw" style="background:#e9efe3"></span>绿<svg class="ico sm check"><use href="#i-check"/></svg></button>
+  <button class="po-item" data-set-theme="night"><span class="sw" style="background:#131519"></span>夜<svg class="ico sm check"><use href="#i-check"/></svg></button>
+</div>
+
+<!-- book context menu -->
+<div class="popover" id="bookMenuPop">
+  <div class="po-label">书籍操作</div>
+  <button class="po-item" data-go="detail"><svg class="ico sm"><use href="#i-book-open"/></svg>查看目录</button>
+  <button class="po-item" data-toast="已开始导出 EPUB（原型）"><svg class="ico sm"><use href="#i-download"/></svg>导出 EPUB</button>
+  <button class="po-item" data-toast="已打开换源面板（原型）"><svg class="ico sm"><use href="#i-refresh"/></svg>换源阅读</button>
+  <button class="po-item" data-confirm="删除这本书及其全部章节？"><svg class="ico sm" style="color:var(--danger)"><use href="#i-trash"/></svg>删除这本书</button>
+</div>
+
+<!-- command palette -->
+<div class="palette" id="palette">
+  <div class="palette-box">
+    <div class="palette-input">
+      <svg class="ico"><use href="#i-search"/></svg>
+      <input id="paletteInput" type="text" placeholder="搜索书籍、页面或操作…" aria-label="命令面板搜索">
+      <span class="kbd" style="border:1px solid var(--line);border-radius:5px;padding:1px 5px;font-size:10px;color:var(--muted)">ESC</span>
+    </div>
+    <div class="palette-list" id="paletteList">
+      <div class="palette-label">跳转</div>
+      <button class="palette-item" data-go="shelf"><svg class="ico sm"><use href="#i-shelf"/></svg>书架<span class="k">G S</span></button>
+      <button class="palette-item" data-go="history"><svg class="ico sm"><use href="#i-clock"/></svg>阅读历史<span class="k">G H</span></button>
+      <button class="palette-item" data-go="sources"><svg class="ico sm"><use href="#i-server"/></svg>书源管理<span class="k">G R</span></button>
+      <button class="palette-item" data-go="design"><svg class="ico sm"><use href="#i-star"/></svg>设计规范<span class="k">G D</span></button>
+      <div class="palette-label">最近</div>
+      <button class="palette-item" data-go="detail"><svg class="ico sm"><use href="#i-book-open"/></svg>无职转生 ～到了异世界就拿出真本事～<span class="k">28%</span></button>
+      <button class="palette-item" data-go="reader"><svg class="ico sm"><use href="#i-bookmark"/></svg>街角的相遇<span class="k">在读</span></button>
+    </div>
+    <div class="palette-foot"><span>↑↓ 选择</span><span>↵ 打开</span><span>esc 关闭</span></div>
+  </div>
+</div>
+
+<!-- confirm modal -->
+<div class="modal-wrap" id="modalWrap">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <h3 id="modalTitle">确认操作</h3>
+    <p id="modalText">此操作不可撤销。</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" data-close>取消</button>
+      <button class="btn btn-danger" id="modalOk">确认删除</button>
+    </div>
+  </div>
+</div>
+
+<!-- mobile more sheet -->
+<div class="sheet" id="sheet" aria-label="更多">
+  <div class="handle"></div>
+  <div class="sheet-grid">
+    <button class="sheet-item" data-go="search"><svg class="ico"><use href="#i-compass"/></svg>发现</button>
+    <button class="sheet-item" data-go="crawl"><svg class="ico"><use href="#i-download"/></svg>抓取</button>
+    <button class="sheet-item" data-go="import"><svg class="ico"><use href="#i-upload"/></svg>导入</button>
+    <button class="sheet-item" data-go="sources"><svg class="ico"><use href="#i-server"/></svg>书源</button>
+    <button class="sheet-item" data-go="design"><svg class="ico"><use href="#i-star"/></svg>设计规范</button>
+    <button class="sheet-item" data-go="comics"><svg class="ico"><use href="#i-comic"/></svg>漫画</button>
+    <button class="sheet-item" data-go="anime"><svg class="ico"><use href="#i-play"/></svg>动漫</button>
+    <button class="sheet-item" data-go="history"><svg class="ico"><use href="#i-clock"/></svg>历史</button>
+  </div>
+  <div class="sheet-themes">
+    <button data-set-theme="paper" class="on">纸</button>
+    <button data-set-theme="sepia">黄</button>
+    <button data-set-theme="green">绿</button>
+    <button data-set-theme="night">夜</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"><svg class="ico sm"><use href="#i-check"/></svg><span id="toastText">已保存</span></div>
+
+<script src="proto.js"></script>
+</body>
+</html>

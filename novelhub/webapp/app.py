@@ -1,6 +1,7 @@
 """本地网页阅读器（Flask）。"""
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import threading
@@ -29,22 +30,94 @@ from ..sources import build_registry
 from ..store import Library
 
 
+_EPNO_RE = __import__("re").compile(r"第\s*(\d{1,4})\s*[话話集]|(?<!\d)(\d{1,4})(?!\d)")
+
+
+def _pick_best_episode(eps: list[dict], ep_no: int, title_hint: str = "") -> int:
+    """在一部番的分集列表里定位当前集，返回下标。
+
+    光用 ep_no-1 当下标很脆：弹弹play 的分集里会混进总集篇、OVA、SP，
+    或者干脆从第 0 集开始，一错就整集弹幕全串。
+    所以先看分集标题里的集号，再看集名相似度，最后才退回下标。
+    """
+    if not eps:
+        return 0
+
+    # 1) 分集标题里抠得出集号的，优先按集号精确匹配
+    for i, e in enumerate(eps):
+        t = str(e.get("episodeTitle") or "")
+        m = _EPNO_RE.search(t)
+        if m:
+            got = m.group(1) or m.group(2)
+            try:
+                if got and int(got) == ep_no:
+                    return i
+            except (TypeError, ValueError):
+                pass
+
+    # 2) 有集名提示就按编辑距离找最像的
+    hint = (title_hint or "").strip()
+    if hint:
+        best_i, best_d = 0, None
+        for i, e in enumerate(eps):
+            t = str(e.get("episodeTitle") or "")
+            d = _levenshtein(t, hint)
+            if best_d is None or d < best_d:
+                best_i, best_d = i, d
+        if best_d is not None:
+            return best_i
+
+    # 3) 兜底：按下标，越界就夹住
+    return min(max(ep_no - 1, 0), len(eps) - 1)
+
+
+def _levenshtein(a: str, b: str) -> int:
+    """编辑距离。番名差一两个字（第几季、剧场版）时靠它排序最稳。"""
+    a = a or ""
+    b = b or ""
+    if a == b:
+        return 0
+    if not a:
+        return len(b)
+    if not b:
+        return len(a)
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        cur = [i]
+        for j, cb in enumerate(b, 1):
+            cur.append(min(prev[j] + 1,          # 删
+                           cur[j - 1] + 1,       # 插
+                           prev[j - 1] + (ca != cb)))  # 换
+        prev = cur
+    return prev[-1]
+
+
 def _pick_best_anime(cands: list[dict], keyword: str) -> dict:
     """从弹弹play 搜索结果里挑最匹配的一部。
 
-    优先级：标题完全相等 > 标题包含关键词 > 第一个。
-    弹弹play 会把同一部番的各季拆成独立 anime，名字差一点点就串季，
-    所以先用「相等」挡一层。
+    弹弹play 会把同一部番的各季拆成独立 anime，光看「包含」会把
+    「进击的巨人」匹配到「进击的巨人 最终季」上，弹幕就串季了。
+    这里改成按编辑距离排序（思路来自 animeko 的 DanmakuMatchers.mostRelevant）：
+    番名距离为主，长度差为辅，取最小者。
     """
     kw = (keyword or "").strip()
+    if not cands:
+        return {}
+    if not kw:
+        return cands[0]
+
+    # 完全相等直接返回，不用算距离
     for a in cands:
         if (a.get("animeTitle") or "").strip() == kw:
             return a
-    for a in cands:
-        t = (a.get("animeTitle") or "")
-        if kw and kw in t:
-            return a
-    return cands[0]
+
+    def score(a: dict) -> tuple:
+        t = (a.get("animeTitle") or "").strip()
+        d = _levenshtein(t, kw)
+        # 长度差当作次级判据：距离相同的时候，更接近原名的优先
+        return (d, abs(len(t) - len(kw)))
+
+    return min(cands, key=score)
 
 
 def create_app(cfg: Config | None = None) -> Flask:
@@ -55,10 +128,21 @@ def create_app(cfg: Config | None = None) -> Flask:
     exporter = Exporter(cfg, lib)
     importer = Importer(lib)
 
-    app = Flask(__name__, template_folder="templates", static_folder="static")
+    # 模板 / 静态资源在冻结 exe 里位于 _MEIPASS，不能靠 Flask 默认的
+    # 相对 __name__ 推导（onefile 解包后 __file__ 不在源码树里）。
+    from .. import paths as _paths
+
+    _tpl = _paths.resource("webapp", "templates")
+    _static = _paths.resource("webapp", "static")
+    app = Flask(
+        __name__,
+        template_folder=str(_tpl),
+        static_folder=str(_static),
+    )
     app.secret_key = "novelhub-local-only"
     app.config["JSON_AS_ASCII"] = False
     app.jinja_env.globals.update(mode="reader")
+    app.jinja_env.auto_reload = True   # 改模板后刷新即可见效，不用重启
 
     # 繁体源（哔哩轻小说等）→ 简体显示。config.convert_to_simplified 关掉就原样输出。
     from ..zhconvert import to_simplified as _to_simplified
@@ -68,8 +152,29 @@ def create_app(cfg: Config | None = None) -> Flask:
         if not getattr(cfg, "convert_to_simplified", True):
             return value
         return _to_simplified(value) if isinstance(value, str) else value
-    # 静态资源带版本号，避免浏览器拿旧的 js/css（改完代码刷新就生效）
-    app.jinja_env.globals["asset_v"] = str(int(time.time()))
+    # 静态资源版本号：按 static/ 下文件的 mtime+size 算哈希。
+    # 以前用 int(time.time())，每次重启都变 → 浏览器缓存永远失效；现在只有真的改了文件才变。
+    static_dir = Path(app.static_folder or "static")
+
+    def _asset_version() -> str:
+        try:
+            items = []
+            for p in static_dir.rglob("*"):
+                if p.suffix in {".jpg", ".jpeg", ".png", ".webp", ".mp4"}:
+                    continue  # 大图不参与，改名/换图本来就该手动刷
+                st = p.stat()
+                items.append(f"{p.relative_to(static_dir).as_posix()}:{int(st.st_mtime)}:{st.st_size}")
+            items.sort()
+            return hashlib.md5("|".join(items).encode("utf-8")).hexdigest()[:8]
+        except OSError:
+            return str(int(time.time()))
+
+    @app.context_processor
+    def _inject_asset_v():
+        return {"asset_v": _asset_version()}
+
+    # 带上 ?v=hash 之后就可以放心让浏览器长缓存；文件一改 hash 变，URL 也变。
+    app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 60 * 60 * 24 * 7
     app.extensions["library"] = lib
     app.extensions["config"] = cfg
 
@@ -300,7 +405,46 @@ def create_app(cfg: Config | None = None) -> Flask:
     # ---------------- 书架 ----------------
     @app.get("/")
     def index():
-        return render_template("index.html", books=lib.list_books())
+        books = lib.list_books()
+        cont = []
+        for b in books:
+            pidx = b["progress_idx"]
+            if pidx is None or not b["n_chapters"]:
+                continue
+            ch = lib.get_chapter(b["id"], pidx)
+            if ch is None:
+                continue
+            prog = lib.get_progress(b["id"])
+            pct = max(1, round(100 * (pidx + 1) / b["n_chapters"]))
+            cont.append(
+                {
+                    "book": b,
+                    "chapter": ch,
+                    "pct": pct,
+                    "at": (prog["updated_at"] if prog else ""),
+                }
+            )
+        cont.sort(key=lambda x: x["at"] or "", reverse=True)
+        done_count = sum(
+            1 for b in books if b["n_chapters"] and b["n_done"] >= b["n_chapters"]
+        )
+        reading_count = sum(
+            1
+            for b in books
+            if b["progress_idx"] is not None
+            and not (b["n_chapters"] and b["n_done"] >= b["n_chapters"])
+        )
+        online_count = sum(
+            1 for b in books if b["n_chapters"] and b["n_done"] == 0
+        )
+        return render_template(
+            "index.html",
+            books=books,
+            continue_items=cont[:3],
+            done_count=done_count,
+            reading_count=reading_count,
+            online_count=online_count,
+        )
 
     # ---------------- 目录 ----------------
     @app.get("/book/<int:bid>")
@@ -320,13 +464,26 @@ def create_app(cfg: Config | None = None) -> Flask:
             cur[2].append(ch)
         prog = lib.get_progress(bid)
         n_all, n_done = lib.chapter_count(bid)
+        n_words = sum(int(c["words"] or 0) for c in chapters)
+        progress_ch = None
+        progress_vol = ""
+        if prog is not None:
+            progress_ch = next(
+                (c for c in chapters if c["idx"] == prog["chapter_idx"]), None
+            )
+            if progress_ch is not None:
+                progress_vol = volumes.get(progress_ch["vol_idx"], "")
         return render_template(
             "book.html",
             book=b,
             groups=groups,
             progress=prog,
+            progress_ch=progress_ch,
+            progress_vol=progress_vol,
             n_all=n_all,
             n_done=n_done,
+            n_words=n_words,
+            n_vols=len(groups),
         )
 
     # ---------------- 阅读 ----------------
@@ -771,9 +928,37 @@ def create_app(cfg: Config | None = None) -> Flask:
             if d["kind"] == "novel" and str(cover).startswith("/cover/"):
                 pass  # 已经是本地封面路由
             items.append(d)
+
+        # 按「今天 / 昨天 / 更早」分组；解析失败的一律归到更早
+        from datetime import date, datetime, timedelta
+
+        today = date.today()
+
+        def _day_label(raw) -> str:
+            try:
+                d = datetime.fromisoformat(str(raw).replace("Z", "")).date()
+            except (TypeError, ValueError):
+                return "更早"
+            if d == today:
+                return "今天"
+            if d == today - timedelta(days=1):
+                return "昨天"
+            return "更早"
+
+        groups: list[dict] = []
+        index: dict[str, dict] = {}
+        for it in items:
+            label = _day_label(it.get("last_read_at"))
+            it["group"] = label
+            if label not in index:
+                index[label] = {"label": label, "items": []}
+                groups.append(index[label])
+            index[label]["items"].append(it)
+
         return render_template(
             "history.html",
             items=items,
+            groups=groups,
             kind=kind,
             counts={
                 "novel": lib.history_count("novel"),
@@ -970,6 +1155,7 @@ def create_app(cfg: Config | None = None) -> Flask:
 
         ep_id = (request.args.get("episode_id") or "").strip()
         anime = (request.args.get("anime") or "").strip()
+        ep_title_hint = (request.args.get("eptitle") or "").strip()
         ep_no = request.args.get("ep", "1")
         try:
             ep_no = max(1, int(ep_no))
@@ -990,7 +1176,7 @@ def create_app(cfg: Config | None = None) -> Flask:
                 if not eps:
                     return jsonify(ok=False, configured=True, comments=[],
                                    error=f"「{best.get('animeTitle')}」没有分集")
-                idx = min(ep_no - 1, len(eps) - 1)
+                idx = _pick_best_episode(eps, ep_no, ep_title_hint)
                 ep_id = str(eps[idx]["episodeId"])
                 ep_title = eps[idx].get("episodeTitle") or ""
             else:
@@ -1794,6 +1980,120 @@ def create_app(cfg: Config | None = None) -> Flask:
         except Exception as exc:  # noqa: BLE001
             flash(f"安装失败：{str(exc)[:150]}")
         return redirect(url_for("sources_page"))
+
+    # ---------------- 聊天：宫城 + 六位管家 ----------------
+    # 宫城沿用 QQ 那边配好的 deepseek；六位管家走智谱 glm-4-flash（免费）。
+    # 每个人的 system prompt 里都塞了一段从 SQLite 现算的真实数据，见 novelhub/personas.py。
+    from .. import personas as cast
+    from ..chat import ChatEngine
+
+    chat_engine = ChatEngine(cfg)
+    app.extensions["chat"] = chat_engine
+
+    def _chat_ready_map() -> dict:
+        out = {}
+        for prov in {p.provider for p in cast.PERSONAS.values()}:
+            try:
+                out[prov] = chat_engine.conf(prov).ready
+            except Exception:  # noqa: BLE001
+                out[prov] = False
+        return out
+
+    def _sse(event: str, payload) -> str:
+        return f"event: {event}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+    @app.get("/chat")
+    def chat_page():
+        who = cast.get(request.args.get("who")).id
+        persona = cast.PERSONAS[who]
+        ready = _chat_ready_map()
+        conf = chat_engine.conf(persona.provider)
+        return render_template(
+            "chat.html",
+            persona=persona,
+            who=who,
+            conf=conf,
+            ready=ready.get(persona.provider, False),
+            roster=cast.roster(lib, cfg, ready),
+            greeting=persona.hello(lib, cfg),
+            chips=cast.CHIPS.get(who, []),
+        )
+
+    @app.get("/api/chat/info")
+    def api_chat_info():
+        who = cast.get(request.args.get("who")).id
+        persona = cast.PERSONAS[who]
+        conf = chat_engine.conf(persona.provider)
+        return jsonify(
+            ok=True, ready=conf.ready, who=persona.id, name=persona.name,
+            model=conf.model, provider=persona.provider, source=conf.source,
+            tools=conf.tools_enabled, status=persona.hello(lib, cfg),
+            hint="" if conf.ready else (
+                f"provider={persona.provider} 没接通：检查 config.json 的 "
+                f"chat.providers.{persona.provider} 或对应的环境变量"),
+            roster=cast.roster(lib, cfg, _chat_ready_map()),
+        )
+
+    @app.post("/api/chat/reset")
+    def api_chat_reset():
+        body = request.get_json(silent=True) or {}
+        who = cast.get(body.get("who")).id
+        chat_engine.reset(f"{who}|{str(body.get('sid') or 'web')[:64]}")
+        return jsonify(ok=True, who=who)
+
+    @app.post("/api/chat")
+    def api_chat():
+        body = request.get_json(silent=True) or {}
+        text = str(body.get("text") or "").strip()
+        sid = str(body.get("sid") or "web")[:64]
+        who = cast.get(body.get("who")).id
+        if not text:
+            return jsonify(ok=False, error="空消息"), 400
+        if len(text) > 4000:
+            text = text[:4000]
+
+        def gen():
+            try:
+                for ev, payload in chat_engine.reply_stream(sid, text, lib=lib, who=who):
+                    yield _sse(ev, payload)
+            except Exception as exc:  # noqa: BLE001
+                yield _sse("error", {"message": f"{type(exc).__name__}: {exc}"[:300]})
+            yield ": end\n\n"
+
+        return Response(
+            gen(),
+            mimetype="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache, no-transform",
+                "X-Accel-Buffering": "no",
+            },
+        )
+
+    @app.get("/sw.js")
+    def service_worker():
+        """Service Worker 必须从根路径发，否则默认作用域只有 /static/。
+
+        放在 static/sw.js 再注册 scope:'/' 会报
+        「scope is not under the max scope allowed」，装到主屏后
+        离线页与页面缓存全部失效。这里直接从根发，并补 Service-Worker-Allowed。
+        """
+        from flask import send_from_directory
+
+        resp = send_from_directory(app.static_folder, "sw.js", mimetype="text/javascript")
+        resp.headers["Service-Worker-Allowed"] = "/"
+        resp.headers["Cache-Control"] = "no-cache"
+        return resp
+
+    @app.get("/healthz")
+    def healthz():
+        """桌面启动器用它判断「服务真的起来了」，别在模板没加载完时就开窗口。"""
+        from .. import __version__
+
+        try:
+            books = lib.stats().get("books")
+        except Exception:  # noqa: BLE001
+            books = None
+        return {"ok": True, "app": "firefly-library", "version": __version__, "books": books}
 
     @app.errorhandler(404)
     def nf(_):

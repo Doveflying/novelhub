@@ -68,5 +68,28 @@
     "auth_mode": "credential",
     "cache_hours": 6,
     "with_related": true
+  },
+  "chat": {
+    "enabled": true,
+    "tools": true,
+    "history_max": 24,
+    "providers": {
+      "deepseek": {
+        "base_url": "https://api.deepseek.com/v1",
+        "api_key": "${DEEPSEEK_API_KEY}",
+        "model": "deepseek-chat",
+        "max_tokens": 900,
+        "timeout": 60,
+        "temperature": 1.0
+      },
+      "zhipu": {
+        "base_url": "https://open.bigmodel.cn/api/paas/v4",
+        "api_key": "${ZHIPU_API_KEY}",
+        "model": "glm-4-flash",
+        "max_tokens": 500,
+        "timeout": 60,
+        "temperature": 0.9
+      }
+    }
   }
 }

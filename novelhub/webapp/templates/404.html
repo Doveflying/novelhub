@@ -1,9 +1,13 @@
 {% extends "base.html" %}
 {% block title %}没有找到{% endblock %}
 {% block content %}
-<div class="empty">
+<div class="empty has-cast">
+  <div class="empty-cast">
+    <img src="{{ url_for('static', filename='cast/shiori-face.jpg') }}" alt="" width="128" height="128">
+  </div>
+  <span class="cast-say">这一格书架是空的…我翻了三遍。</span>
   <p class="big">404</p>
   <p>这本书或页面不在书库里。</p>
-  <p><a class="btn" href="{{ url_for('index') }}">回书架</a></p>
+  <p><a class="btn btn-accent" href="{{ url_for('index') }}">回书架</a></p>
 </div>
 {% endblock %}

@@ -1,16 +1,32 @@
 {% extends "base.html" %}
 {% block title %}漫画书架{% endblock %}
 {% block content %}
-<div class="shelf-head">
-  <h1>漫画</h1>
-  <div class="shelf-actions">
-    <a class="btn" href="{{ url_for('search', q='', kind='comic') }}">聚合搜索</a>
-    <a class="btn ghost" href="{{ url_for('sources_page') }}">源管理</a>
+<section class="cast-banner" data-cast="rin">
+  <div class="cb-copy">
+    <div class="cb-kicker"><svg class="ico"><use href="#i-comic"/></svg> MANGA CLUB</div>
+    <h1 class="cb-title">漫画书架 <small>{{ items | length }} 部</small></h1>
+    <p class="cb-sub">凛把最近在读的漫画排好了，分镜和跨页彩图都按原样留着，接着上次的页码看就行。</p>
+    <div class="cb-actions">
+      <a class="btn btn-accent" href="{{ url_for('search', q='', kind='comic') }}">聚合搜索</a>
+      <a class="btn btn-ghost" href="{{ url_for('sources_page') }}">源管理</a>
+    </div>
   </div>
-</div>
+  <div class="cb-art" aria-hidden="true">
+    <span class="cb-ring"></span>
+    <div class="cb-bubble speech">
+      <span class="hb-name">凛 <em>漫画担当</em></span>
+      <p>{{ '这一话的分镜很漂亮，慢一点翻～' if items else '书架空着，去捞一部回来？' }}</p>
+    </div>
+    <figure class="cb-portrait"><img src="{{ url_for('static', filename='cast/rin.jpg') }}" alt="" width="720" height="913"></figure>
+  </div>
+</section>
 
 {% if not items %}
-  <div class="empty">
+  <div class="empty has-cast">
+    <div class="empty-cast">
+      <img src="{{ url_for('static', filename='cast/rin-face.jpg') }}" alt="" width="128" height="128">
+    </div>
+    <span class="cast-say">格子与格子之间，还什么都没画…</span>
     <p class="big">漫画书架还是空的</p>
     <p>去<a href="{{ url_for('search', q='', kind='comic') }}">聚合搜索</a>找一个作品，点进去会自动收进来。</p>
   </div>

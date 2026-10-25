@@ -1,0 +1,62 @@
+{
+  "id": "/",
+  "name": "书萤 · 星屑书房",
+  "short_name": "书萤",
+  "description": "本地轻小说 / 漫画 / 番剧聚合书房：抓取、导入、导出、离线阅读。",
+  "lang": "zh-CN",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui", "browser"],
+  "orientation": "any",
+  "background_color": "#fff6f9",
+  "theme_color": "#ff4f87",
+  "categories": ["books", "entertainment", "productivity"],
+  "icons": [
+    {
+      "src": "/static/brand/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/brand/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/brand/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/static/brand/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "书库",
+      "short_name": "书库",
+      "url": "/",
+      "icons": [{ "src": "/static/brand/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "阅读历史",
+      "short_name": "历史",
+      "url": "/history",
+      "icons": [{ "src": "/static/brand/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "抓取新书",
+      "short_name": "抓取",
+      "url": "/crawl",
+      "icons": [{ "src": "/static/brand/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

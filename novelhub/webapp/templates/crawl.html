@@ -3,6 +3,17 @@
 {% block content %}
 <h1 class="page-title">抓取新书</h1>
 
+<aside class="cast-note" data-cast="aju">
+  <span class="cn-face">
+    <img src="{{ url_for('static', filename='cast/aju-face.jpg') }}" alt="" width="52" height="52">
+  </span>
+  <div class="cn-body">
+    <div class="cn-kicker">小蛛 · 书源担当</div>
+    <p class="cn-line">目录页、书籍页、任意章节页贴进来都行，我会自己顺着网找到全书。整本抓取慢一点，进度条走完就好。</p>
+  </div>
+  <span class="cn-tag">抓取 / 补章</span>
+</aside>
+
 <form class="form" method="post" action="{{ url_for('crawl_start') }}">
   <label class="field">
     <span>书籍地址</span>
@@ -32,8 +43,10 @@
     </label>
   </div>
 
-  <button class="btn" type="submit">开始抓取</button>
-  <a class="btn ghost" href="{{ url_for('index') }}">取消</a>
+  <div class="form-actions">
+    <button class="btn btn-accent" type="submit">开始抓取</button>
+    <a class="btn btn-ghost" href="{{ url_for('index') }}">取消</a>
+  </div>
 </form>
 
 <section class="panel">

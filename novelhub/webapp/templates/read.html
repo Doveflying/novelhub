@@ -3,31 +3,35 @@
 {% block bodyclass %}reading{% endblock %}
 {% block mainclass %}reader-main{% endblock %}
 {% block content %}
-<div class="reader-toolbar">
-  <button class="icon-btn" id="tocBtn" title="目录">☰</button>
-  <div class="reader-title">
+<div class="reader-top" id="readerTop">
+  <a class="dock-btn" href="{{ url_for('book', bid=book.id) }}" title="返回目录" aria-label="返回目录">
+    <svg class="ico sm"><use href="#i-arrow-l"/></svg>
+  </a>
+  <div class="rt-info">
     <span class="rt-book">{{ book.title | zh }}</span>
     <span class="rt-ch">{{ chapter.title | zh }}</span>
   </div>
-  <div class="reader-tools">
-    <button class="icon-btn" id="settingsBtn" title="显示设置">Aa</button>
-  </div>
+  <span class="rt-pct" id="rtPct">0%</span>
+  <button class="dock-btn" id="settingsBtn" type="button" title="显示设置" aria-label="显示设置">
+    <svg class="ico sm"><use href="#i-type"/></svg><span>Aa</span>
+  </button>
 </div>
 
-<div class="reader-progress"><i id="scrollBar"></i></div>
+<div class="reader-line"><i id="scrollBar"></i></div>
 
-<article class="reader wrap-narrow" id="reader"
+<article class="reader-body" id="reader"
          data-book="{{ book.id }}" data-idx="{{ chapter.idx }}"
          data-next="{{ next_ch.idx if next_ch else '' }}"
          data-next-title="{{ (next_ch.title if next_ch else '') | zh | e }}"
          {% if live_defer %}data-live="1"{% endif %}>
+  <div class="chapter-eyebrow">{{ book.title | zh }}</div>
   <h1 class="chapter-title">{{ chapter.title | zh }}</h1>
   <div class="chapter-meta">
-    <span id="wordCount">{{ (chapter.words or 0) }}</span> 字 · {{ pos + 1 }}/{{ chapters | length }}
+    <span><span id="wordCount">{{ (chapter.words or 0) }}</span> 字 · {{ pos + 1 }}/{{ chapters | length }}</span>
     {% if online %}
-      · <span class="badge live">在线读取 · 未落库</span>
+      <span class="badge live">在线读取 · 未落库</span>
     {% elif stored %}
-      · <span class="badge">已存本地</span>
+      <span class="badge">已存本地</span>
     {% endif %}
     {% if book.url %}
       {% if online %}
@@ -48,24 +52,45 @@
       {{ html_body | safe }}
     {% endif %}
   </div>
-  <nav class="chapter-nav">
-    {% if prev_ch %}
-      <a class="btn ghost" href="{{ url_for('read', bid=book.id, idx=prev_ch.idx) }}" rel="prev">← 上一章</a>
-    {% else %}<span></span>{% endif %}
-    <a class="btn ghost" href="{{ url_for('book', bid=book.id) }}">目录</a>
-    {% if next_ch %}
-      <a class="btn ghost{% if next_warm %} warm{% endif %}"
-         href="{{ url_for('read', bid=book.id, idx=next_ch.idx) }}" rel="next"
-         {% if next_warm %}title="下一章已缓存，点开即读"{% endif %}>下一章 →</a>
-    {% else %}<span></span>{% endif %}
-  </nav>
 
+  <div class="chapter-end">
+    <div class="fin">本章完</div>
+    <nav class="chapter-nav">
+      <a class="btn btn-ghost" href="{{ url_for('book', bid=book.id) }}">回到目录</a>
+    </nav>
+  </div>
 </article>
+
+<nav class="reader-dock chapter-nav" id="readerDock">
+  {% if prev_ch %}
+    <a class="dock-btn" href="{{ url_for('read', bid=book.id, idx=prev_ch.idx) }}" rel="prev" title="{{ prev_ch.title | zh }}">
+      <svg class="ico sm"><use href="#i-arrow-l"/></svg><span>上一章</span>
+    </a>
+  {% else %}
+    <span class="dock-btn" style="opacity:.35;pointer-events:none"><svg class="ico sm"><use href="#i-arrow-l"/></svg><span>上一章</span></span>
+  {% endif %}
+  <span class="dock-page">{{ pos + 1 }} / {{ chapters | length }}</span>
+  {% if next_ch %}
+    <a class="dock-btn primary" href="{{ url_for('read', bid=book.id, idx=next_ch.idx) }}" rel="next"
+       {% if next_warm %}title="下一章已缓存，点开即读"{% endif %}>
+      <span>下一章</span><svg class="ico sm"><use href="#i-arrow-r"/></svg>
+    </a>
+  {% else %}
+    <span class="dock-btn" style="opacity:.35;pointer-events:none"><span>下一章</span><svg class="ico sm"><use href="#i-arrow-r"/></svg></span>
+  {% endif %}
+  <span class="dock-sep"></span>
+  <button class="dock-btn" id="tocBtn" type="button" title="目录" aria-label="目录">
+    <svg class="ico sm"><use href="#i-list"/></svg>
+  </button>
+</nav>
 
 <aside class="drawer" id="tocDrawer">
   <div class="drawer-head">
-    <strong>{{ book.title }}</strong>
-    <button class="icon-btn" id="tocClose">×</button>
+    <strong>{{ book.title | zh }}</strong>
+    <span class="sub">{{ chapters | length }} 章</span>
+    <button class="iconbtn" id="tocClose" type="button" aria-label="关闭目录">
+      <svg class="ico sm"><use href="#i-x"/></svg>
+    </button>
   </div>
   <div class="drawer-body">
     {% set ns = namespace(v=-1) %}
@@ -74,25 +99,101 @@
         {% set ns.v = ch.vol_idx %}
         <div class="drawer-vol">{{ (volumes.get(ch.vol_idx) or ('第' ~ (ch.vol_idx + 1) ~ '卷' if ch.vol_idx else '正文')) | zh }}</div>
       {% endif %}
-      <a class="drawer-ch {% if ch.idx == chapter.idx %}on{% endif %}" href="{{ url_for('read', bid=book.id, idx=ch.idx) }}">{{ ch.title | zh }}</a>
+      <a class="drawer-ch {% if ch.idx == chapter.idx %}on{% endif %}" href="{{ url_for('read', bid=book.id, idx=ch.idx) }}">
+        <span class="num">{{ '%02d' % (ch.idx + 1) }}</span>
+        <span class="name">{{ ch.title | zh }}</span>
+        {% if not ch.words %}<span class="state">未抓取</span>{% endif %}
+      </a>
     {% endfor %}
   </div>
 </aside>
 
 <div class="settings-pop" id="settingsPop">
-  <label>字号 <input type="range" id="fontSize" min="15" max="30" step="1"></label>
-  <label>行距 <input type="range" id="lineHeight" min="150" max="260" step="5"></label>
-  <label>版心 <input type="range" id="measure" min="32" max="72" step="2"></label>
-  <div class="theme-row">
-    <button data-theme="paper" class="swatch">纸</button>
-    <button data-theme="sepia" class="swatch">黄</button>
-    <button data-theme="green" class="swatch">绿</button>
-    <button data-theme="night" class="swatch">夜</button>
+  <div class="sp-title">显示设置</div>
+  <div class="sp-sub">只影响这篇正文，会记住你的选择</div>
+
+  <div class="set-group">
+    <label>字号 <input type="range" id="fontSize" min="15" max="30" step="1"></label>
+    <label>行距 <input type="range" id="lineHeight" min="150" max="260" step="5"></label>
+    <label>版心 <input type="range" id="measure" min="32" max="72" step="2"></label>
   </div>
-  <div class="kbd-hint">← → 翻章 · Esc 关闭</div>
+
+  <div class="set-group">
+    <div class="set-label">正文字体</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px">
+      <button type="button" class="font-opt" data-font="serif" style="height:32px;border:1px solid var(--line);border-radius:8px;background:transparent;font-family:var(--font-serif)">宋体</button>
+      <button type="button" class="font-opt" data-font="sans" style="height:32px;border:1px solid var(--line);border-radius:8px;background:transparent;font-family:var(--font-sans)">黑体</button>
+    </div>
+  </div>
+
+  <div class="set-group">
+    <div class="set-label">阅读主题</div>
+    <div class="theme-row">
+      <button data-theme="paper" class="swatch">樱</button>
+      <button data-theme="sepia" class="swatch">昏</button>
+      <button data-theme="green" class="swatch">薄荷</button>
+      <button data-theme="night" class="swatch">夜</button>
+    </div>
+    <div class="kbd-hint">小雪在左下角陪你 · ← → 翻章 · Esc 关闭面板</div>
+  </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script src="{{ url_for('static', filename='read.js') }}{{ '?v=' ~ asset_v }}"></script>
+<script>
+(function () {
+  /* ---- 正文字体：宋 / 黑 ---- */
+  var FKEY = 'nh-reader-font';
+  var opts = Array.prototype.slice.call(document.querySelectorAll('.font-opt'));
+  function paintFont(f) {
+    document.body.classList.toggle('prose-sans', f === 'sans');
+    opts.forEach(function (b) {
+      var on = b.getAttribute('data-font') === f;
+      b.style.borderColor = on ? 'var(--accent)' : 'var(--line)';
+      b.style.color = on ? 'var(--accent)' : '';
+      b.style.background = on ? 'var(--accent-soft)' : 'transparent';
+    });
+  }
+  var saved = 'serif';
+  try { saved = localStorage.getItem(FKEY) || 'serif'; } catch (e) {}
+  paintFont(saved);
+  opts.forEach(function (b) {
+    b.addEventListener('click', function () {
+      var f = b.getAttribute('data-font');
+      try { localStorage.setItem(FKEY, f); } catch (e) {}
+      paintFont(f);
+    });
+  });
+
+  /* ---- 阅读 chrome：下滑隐藏、上滑回来 + 百分比 ---- */
+  var top = document.getElementById('readerTop');
+  var dock = document.getElementById('readerDock');
+  var pct = document.getElementById('rtPct');
+  var bar = document.getElementById('scrollBar');
+  var last = window.scrollY;
+  var ticking = false;
+
+  function ratio() {
+    var h = document.documentElement.scrollHeight - window.innerHeight;
+    return h > 0 ? Math.min(1, window.scrollY / h) : 0;
+  }
+  function onScroll() {
+    ticking = false;
+    var r = ratio();
+    if (bar) bar.style.width = (r * 100).toFixed(1) + '%';
+    if (pct) pct.textContent = Math.round(r * 100) + '%';
+    var y = window.scrollY;
+    if (!top || !dock) return;
+    var down = y > last && y > 90;
+    top.classList.toggle('hide', down);
+    dock.classList.toggle('hide', down);
+    last = y;
+  }
+  window.addEventListener('scroll', function () {
+    if (!ticking) { ticking = true; requestAnimationFrame(onScroll); }
+  }, { passive: true });
+  onScroll();
+})();
+</script>
 {% endblock %}

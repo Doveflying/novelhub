@@ -78,7 +78,13 @@
 
   /* 兜底：有些浏览器/扩展把懒加载图换成占位元素，既不触发 error，
      也不会让 complete 变 true。对这类「看着是空的」图直接探一次真实状态。
-     只探前 20 张，避免一次打太多请求。 */
+     只探前 20 张，避免一次打太多请求。
+
+     注意：必须用 Image() 探，不能用 fetch()。
+     封面大多来自外站（bilinovel 等），<img> 能显示是因为图片请求不受 CORS 限制，
+     但 fetch() 读不到 Access-Control-Allow-Origin 就一律报错 ——
+     用 fetch 探会把「其实显示正常的外链封面」全判成失败，
+     页面上就冒出「N 处内容没加载出来」的假警报。 */
   var probed = 0;
   function probeEmptyImages() {
     var imgs = document.querySelectorAll('img');
@@ -93,18 +99,31 @@
       probed += 1;
       pending += 1;
       (function (el, url) {
-        fetch(url, { cache: 'no-store' })
-          .then(function (r) {
-            if (r && r.ok) return;
-            el.dataset.rbBad = '1';
-            failCount += 1;
-            show(el.getAttribute('alt') || '图片', failCount);
-          })
-          .catch(function () {
-            el.dataset.rbBad = '1';
-            failCount += 1;
-            show(el.getAttribute('alt') || '图片', failCount);
-          });
+        var probe = new Image();
+        var done = false;
+        function ok() {
+          if (done) return;
+          done = true;
+          el.dataset.rbOk = '1';
+        }
+        function bad() {
+          if (done) return;
+          done = true;
+          el.dataset.rbBad = '1';
+          failCount += 1;
+          show(el.getAttribute('alt') || '图片', failCount);
+        }
+        probe.onload = ok;
+        probe.onerror = bad;
+        probe.referrerPolicy = 'no-referrer';
+        probe.src = url;
+        /* 8 秒还没结论就当它没问题，别把网络慢算成坏图 */
+        setTimeout(function () {
+          if (!done) {
+            done = true;
+            if (probe.naturalWidth > 0) el.dataset.rbOk = '1';
+          }
+        }, 8000);
       })(img, src);
     }
     return pending;

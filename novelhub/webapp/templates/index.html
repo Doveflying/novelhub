@@ -1,63 +1,191 @@
 {% extends "base.html" %}
-{% block title %}书架 · 我的轻小说库{% endblock %}
+{% block title %}书架 · 书萤{% endblock %}
+{% block crumb %}书架{% endblock %}
 {% block content %}
-<div class="shelf-head">
-  <h1>书架</h1>
-  <div class="shelf-actions">
-    <a class="btn" href="{{ url_for('crawl_page') }}">＋ 抓取新书</a>
-    <a class="btn ghost" href="{{ url_for('import_page') }}">导入本地文件</a>
+<section class="shelf-hero">
+  <div class="hero-copy">
+    <div class="eyebrow"><svg class="ico"><use href="#i-spark"/></svg> LIBRARY CLUB · HOSHIKUZU</div>
+    <h1 class="hero-title">书架<span class="hero-jp">ほんだな</span></h1>
+    <p class="hero-sub">
+      <b>{{ books | length }}</b> 本藏书 · <b>{{ stats.chapters }}</b> 章 · 已下载 <b>{{ done_count }}</b> 本。
+      已按最近阅读顺序排好，接着上次的读吧。
+    </p>
+    <div class="hero-chips">
+      <span class="hchip">藏书 <b>{{ books | length }}</b></span>
+      <span class="hchip">章节 <b>{{ stats.chapters }}</b></span>
+      <span class="hchip">已下载 <b>{{ done_count }}</b></span>
+      <span class="hchip"><i>●</i>在读 <b>{{ reading_count }}</b></span>
+    </div>
+    <div class="hero-actions">
+      <a class="btn btn-ghost" href="{{ url_for('import_page') }}">
+        <svg class="ico"><use href="#i-upload"/></svg>导入本地文件
+      </a>
+      <a class="btn btn-accent" href="{{ url_for('crawl_page') }}">
+        <svg class="ico"><use href="#i-plus"/></svg>抓取新书
+      </a>
+    </div>
+  </div>
+
+  <div class="hero-art" aria-hidden="true">
+    <span class="hero-stage"></span>
+    <span class="hero-ring"></span>
+    <div class="hero-bubble speech">
+      <span class="hb-name">栞 <em>图书委员</em></span>
+      {% if continue_items %}
+        {% set first = continue_items[0] %}
+        <p>上次停在《{{ first.book.title | zh }}》的 {{ first.pct }}%，要接着读吗？</p>
+      {% elif books %}
+        <p>欢迎回来～今天想从哪一本开始？</p>
+      {% else %}
+        <p>书架还空着…去抓一本回来吧，我等你。</p>
+      {% endif %}
+    </div>
+    <figure class="hero-portrait">
+      <img src="{{ url_for('static', filename='cast/shiori.jpg') }}" alt="" width="720" height="913">
+    </figure>
+    <span class="hero-name">栞 <em>图书委员</em></span>
+    <span class="hero-vert">ものがたりの つづき</span>
+    <span class="spark s1"></span>
+    <span class="spark s2"></span>
+    <span class="spark s3"></span>
+    <span class="petal p1"></span>
+    <span class="petal p2"></span>
+    <span class="petal p3"></span>
+  </div>
+</section>
+
+{% if continue_items %}
+<div class="continue-row">
+  {% for it in continue_items %}
+  <article class="cont-card">
+    <a class="cont-cover" href="{{ url_for('book', bid=it.book.id) }}" aria-label="{{ it.book.title | zh }}">
+      <span class="cover-fallback"><b>{{ (it.book.title | zh)[:2] }}</b></span>
+      {% if it.book.cover_path %}
+        <img src="{{ url_for('cover', bid=it.book.id) }}" alt="" loading="lazy" onerror="this.style.display='none'">
+      {% elif it.book.cover %}
+        <img src="{{ it.book.cover }}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'">
+      {% endif %}
+    </a>
+    <div class="cont-body">
+      <div class="cont-kicker">继续阅读</div>
+      <h3 class="cont-title">
+        <a href="{{ url_for('book', bid=it.book.id) }}">{{ it.book.title | zh }}</a>
+      </h3>
+      <p class="cont-ch">
+        {% if it.chapter.vol_idx %}第 {{ it.chapter.vol_idx + 1 }} 卷 · {% endif %}{{ it.chapter.title | zh }}
+      </p>
+      <div class="cont-foot">
+        <div class="progress"><i style="width: {{ it.pct }}%"></i></div>
+        <span class="cont-pct">{{ it.pct }}%</span>
+        <a class="cont-go" href="{{ url_for('read', bid=it.book.id, idx=it.book.progress_idx) }}" aria-label="继续阅读">
+          <svg class="ico sm"><use href="#i-arrow-r"/></svg>
+        </a>
+      </div>
+    </div>
+  </article>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="shelf-toolbar">
+  <div class="seg" role="tablist" aria-label="筛选书籍">
+    <button class="on" type="button" data-filter="all" role="tab" aria-selected="true">全部 <span class="seg-n">{{ books | length }}</span></button>
+    <button type="button" data-filter="reading" role="tab">在读 <span class="seg-n">{{ reading_count }}</span></button>
+    <button type="button" data-filter="done" role="tab">已下载 <span class="seg-n">{{ done_count }}</span></button>
+    <button type="button" data-filter="online" role="tab">在线 <span class="seg-n">{{ online_count }}</span></button>
+  </div>
+  <div class="toolbar-right">
+    <input class="filter-input" id="shelfFilter" type="search" placeholder="筛选书名…" aria-label="筛选书名">
+    <button class="selectbtn" id="sortBtn" type="button" title="切换排序">
+      <svg class="ico sm"><use href="#i-settings"/></svg>
+      <span data-sort-label>最近更新</span>
+      <svg class="ico sm"><use href="#i-arrow-r"/></svg>
+    </button>
+    <button class="iconbtn" id="viewBtn" type="button" aria-label="切换视图" title="切换视图">
+      <svg class="ico"><use href="#i-grid"/></svg>
+    </button>
   </div>
 </div>
 
-{% if not books %}
-  <div class="empty">
-    <p class="big">书架还是空的</p>
-    <p>把轻小说页面地址贴进「抓取」，或者把已有的 txt / epub 拖进「导入」。</p>
-    <p class="mono">支持站点：{{ sources | join(' / ') }}（可在 config.json 里扩展）</p>
-  </div>
-{% else %}
-  <div class="grid">
-    {% for b in books %}
-    <article class="card">
-      <a class="cover" href="{{ url_for('book', bid=b.id) }}">
-        {% if b.cover_path %}
-          <img src="{{ url_for('cover', bid=b.id) }}" alt="{{ b.title | zh }}" loading="lazy">
-        {% elif b.cover %}
-          <img src="{{ b.cover }}" alt="{{ b.title | zh }}" loading="lazy" referrerpolicy="no-referrer">
+{% if books %}
+<div class="books" id="bookGrid">
+  {% for b in books %}
+    {% set pct = ((100 * b.n_done / b.n_chapters) | round | int) if b.n_chapters else 0 %}
+    {% set read_pct = ((100 * (b.progress_idx + 1) / b.n_chapters) | round | int) if (b.progress_idx is not none and b.n_chapters) else 0 %}
+    {% set is_done = b.n_chapters and b.n_done >= b.n_chapters %}
+    {% set state = 'done' if is_done else ('reading' if b.progress_idx is not none else ('online' if b.n_done == 0 and b.n_chapters else 'idle')) %}
+    <article class="book"
+             data-state="{{ state }}"
+             data-title="{{ b.title | zh }}"
+             data-progress="{{ read_pct }}"
+             data-updated="{{ b.updated_at or '' }}">
+      <div class="book-cover">
+        <a class="cover-link" href="{{ url_for('book', bid=b.id) }}" aria-label="{{ b.title | zh }}">
+          <span class="cover-fallback"><b>{{ (b.title | zh)[:2] }}</b><span>书萤</span></span>
+          {% if b.cover_path %}
+            <img src="{{ url_for('cover', bid=b.id) }}" alt="" loading="lazy" onerror="this.style.display='none'">
+          {% elif b.cover %}
+            <img src="{{ b.cover }}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'">
+          {% endif %}
+        </a>
+        {% if b.n_done > 0 and b.progress_idx is not none %}
+          <a class="book-quick" href="{{ url_for('read', bid=b.id, idx=b.progress_idx) }}">继续阅读</a>
+        {% elif b.n_done > 0 %}
+          <a class="book-quick" href="{{ url_for('read', bid=b.id, idx=0) }}">开始阅读</a>
         {% else %}
-          <span class="cover-fallback">{{ (b.title | zh)[:2] }}</span>
+          <a class="book-quick" href="{{ url_for('book', bid=b.id) }}">查看目录</a>
         {% endif %}
-      </a>
-      <div class="card-body">
-        <h3><a href="{{ url_for('book', bid=b.id) }}">{{ b.title | zh }}</a></h3>
-        <p class="meta">{{ b.author or '佚名' }}{% if b.category %} · {{ b.category }}{% endif %}</p>
-        <p class="meta small">
-          {% if b.n_chapters == 0 %}
-            <span class="chip">无章节</span>
+        <details class="book-menu-wrap">
+          <summary class="book-menu" title="更多操作" aria-label="更多操作">
+            <svg class="ico sm"><use href="#i-more"/></svg>
+          </summary>
+          <div class="book-menu-pop">
+            <a href="{{ url_for('book', bid=b.id) }}"><svg class="ico sm"><use href="#i-book-open"/></svg>查看目录</a>
+            <a href="{{ url_for('export_book', bid=b.id, fmt='epub') }}"><svg class="ico sm"><use href="#i-download"/></svg>导出 EPUB</a>
+            {% if b.url %}<a href="{{ url_for('switch_source', bid=b.id) }}"><svg class="ico sm"><use href="#i-refresh"/></svg>换源阅读</a>{% endif %}
+            <form method="post" action="{{ url_for('delete_book', bid=b.id) }}" onsubmit="return confirm('确定删除这本书及其全部章节？')">
+              <button type="submit"><svg class="ico sm"><use href="#i-trash"/></svg>删除这本书</button>
+            </form>
+          </div>
+        </details>
+      </div>
+      <div class="book-body">
+        <h3 class="book-title"><a href="{{ url_for('book', bid=b.id) }}">{{ b.title | zh }}</a></h3>
+        <p class="book-meta">{{ b.author or '佚名' }}{% if b.category %} · {{ b.category }}{% endif %}</p>
+        <div class="book-foot">
+          {% if not b.n_chapters %}
+            <span class="dot"></span><span class="book-state">无章节</span>
+          {% elif is_done %}
+            <span class="dot jade"></span><span class="book-state">已下载 · {{ b.n_done }} 章</span>
           {% elif b.n_done == 0 %}
-            <span class="chip online">在线读</span> {{ b.n_chapters }} 章 · 不占本地
-          {% elif b.n_done >= b.n_chapters %}
-            <span class="chip done">已下载</span> {{ b.n_done }} 章 · {{ (b.n_words / 10000) | round(1) }} 万字
+            <span class="dot blue"></span><span class="book-state">在线读 · {{ b.n_chapters }} 章</span>
+          {% elif b.progress_idx is not none %}
+            <span class="dot amber"></span><div class="progress"><i style="width: {{ read_pct }}%"></i></div><span class="book-pct">{{ read_pct }}%</span>
           {% else %}
-            <span class="chip part">部分</span> {{ b.n_done }}/{{ b.n_chapters }} 章 · {{ (b.n_words / 10000) | round(1) }} 万字
+            <span class="dot amber"></span><div class="progress"><i style="width: {{ pct }}%"></i></div><span class="book-pct">{{ pct }}%</span>
           {% endif %}
-        </p>
-        <div class="bar"><i style="width: {{ (100 * b.n_done / b.n_chapters) if b.n_chapters else 0 }}%"></i></div>
-        <div class="card-actions">
-          {% if b.n_done > 0 %}
-            <a class="btn sm" href="{{ url_for('read', bid=b.id, idx=(b.progress_idx if b.progress_idx is not none else 0)) }}">
-              {% if b.progress_idx is not none %}继续阅读{% else %}开始阅读{% endif %}
-            </a>
-          {% endif %}
-          <a class="btn sm ghost" href="{{ url_for('book', bid=b.id) }}">目录</a>
-          <a class="btn sm ghost" href="{{ url_for('export_book', bid=b.id, fmt='epub') }}">EPUB</a>
-          <form method="post" action="{{ url_for('delete_book', bid=b.id) }}" onsubmit="return confirm('删除《{{ b.title | zh }}》及其全部章节？')">
-            <button class="btn sm danger" type="submit">删除</button>
-          </form>
         </div>
       </div>
     </article>
-    {% endfor %}
+  {% endfor %}
+</div>
+<div class="empty" id="shelfEmpty" style="display:none">
+  <p class="big">没有匹配的书</p>
+  <p>换个筛选条件，或清空搜索词试试。</p>
+</div>
+{% else %}
+<div class="empty has-cast">
+  <div class="empty-cast">
+    <img src="{{ url_for('static', filename='cast/shiori-face.jpg') }}" alt="" width="128" height="128">
   </div>
+  <span class="cast-say">书架还空着，我有点寂寞…</span>
+  <p class="big">从第一本开始吧</p>
+  <p>把轻小说页面地址贴进「抓取」，或者把已有的 txt / epub 拖进「导入」。</p>
+  <p class="small">支持站点：{{ sources | join(' / ') }}（可在 config.json 里扩展）</p>
+  <div class="actions">
+    <a class="btn btn-accent" href="{{ url_for('crawl_page') }}">抓取新书</a>
+    <a class="btn btn-ghost" href="{{ url_for('import_page') }}">导入本地文件</a>
+  </div>
+</div>
 {% endif %}
 {% endblock %}

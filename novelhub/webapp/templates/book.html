@@ -1,53 +1,148 @@
 {% extends "base.html" %}
 {% block title %}{{ book.title | zh }} · 目录{% endblock %}
+{% block crumb %}{{ book.title | zh }}{% endblock %}
 {% block content %}
-<div class="book-head">
-  <div class="book-cover">
+<a class="backlink" href="{{ url_for('index') }}">
+  <svg class="ico sm"><use href="#i-arrow-l"/></svg>返回书架
+</a>
+
+<div class="detail-hero">
+  {% if book.cover_path or book.cover %}
+  <div class="hero-wash" style="background-image:url('{{ url_for('cover', bid=book.id) if book.cover_path else book.cover }}')"></div>
+  {% endif %}
+  <div class="detail-cover">
+    <span class="cover-fallback"><b>{{ (book.title | zh)[:2] }}</b><span>书萤</span></span>
     {% if book.cover_path %}
-      <img src="{{ url_for('cover', bid=book.id) }}" alt="">
+      <img src="{{ url_for('cover', bid=book.id) }}" alt="{{ book.title | zh }}" onerror="this.style.display='none'">
     {% elif book.cover %}
-      <img src="{{ book.cover }}" alt="" referrerpolicy="no-referrer">
-    {% else %}
-      <span class="cover-fallback">{{ (book.title | zh)[:2] }}</span>
+      <img src="{{ book.cover }}" alt="{{ book.title | zh }}" referrerpolicy="no-referrer" onerror="this.style.display='none'">
     {% endif %}
   </div>
-  <div class="book-info">
-    <h1>{{ book.title | zh }}</h1>
-    <p class="meta">{{ book.author or '佚名' }}{% if book.category %} · {{ book.category }}{% endif %}{% if book.status %} · {{ book.status }}{% endif %}</p>
-    <p class="meta small">{{ n_done }}/{{ n_all }} 章已抓取{% if book.url %} · <a href="{{ book.url }}" target="_blank" rel="noreferrer">来源页</a>{% endif %}</p>
-    {% if book.description %}<p class="desc">{{ book.description }}</p>{% endif %}
-    <div class="card-actions">
+
+  <div class="detail-info">
+    <div class="detail-kicker">
+      <span>本地藏书</span><span class="sep"></span>
+      <span>{{ n_vols }} 卷 · {{ n_all }} 章</span>
+      {% if book.url %}<span class="sep"></span><a href="{{ book.url }}" target="_blank" rel="noreferrer">来源页</a>{% endif %}
+    </div>
+    <h1 class="detail-title">{{ book.title | zh }}</h1>
+    {% if book.author %}<p class="detail-sub">{{ book.author }}</p>{% endif %}
+
+    <div class="detail-stats">
+      <div class="stat"><b>{{ n_done }}</b><span>已抓取章节</span></div>
+      <div class="stat"><b>{{ n_all }}</b><span>章节总数</span></div>
+      <div class="stat"><b>{{ (n_words / 10000) | round(1) }}<small style="font-size:11px"> 万</small></b><span>正文字数</span></div>
+      <div class="stat"><b>{{ n_vols }}</b><span>分卷</span></div>
+    </div>
+
+    {% if book.description %}
+    <p class="detail-desc" id="bookDesc">{{ book.description }}</p>
+    <button class="desc-toggle" type="button" id="descToggle">展开全部简介</button>
+    {% endif %}
+
+    <div class="detail-actions">
       {% if n_done %}
-        <a class="btn" href="{{ url_for('read', bid=book.id, idx=(progress.chapter_idx if progress else 0)) }}">继续阅读</a>
+        <a class="btn btn-accent btn-lg" href="{{ url_for('read', bid=book.id, idx=(progress.chapter_idx if progress else 0)) }}">
+          <svg class="ico"><use href="#i-book-open"/></svg>{{ '继续阅读' if progress else '开始阅读' }}
+        </a>
       {% endif %}
       {% if book.url and n_done < n_all %}
         <form method="post" action="{{ url_for('crawl_resume', bid=book.id) }}">
-          <button class="btn" type="submit">补抓未完成章节（{{ n_all - n_done }}）</button>
+          <button class="btn" type="submit">
+            <svg class="ico"><use href="#i-download"/></svg>补抓未完成章节（{{ n_all - n_done }}）
+          </button>
         </form>
       {% endif %}
-      <a class="btn ghost" href="{{ url_for('export_book', bid=book.id, fmt='epub') }}">导出 EPUB</a>
-      <a class="btn ghost" href="{{ url_for('export_book', bid=book.id, fmt='txt') }}">TXT</a>
-      <a class="btn ghost" href="{{ url_for('export_book', bid=book.id, fmt='md') }}">Markdown</a>
-      <a class="btn ghost" href="{{ url_for('switch_source', bid=book.id) }}">换源阅读（找同名）</a>
+      <a class="btn btn-ghost" href="{{ url_for('export_book', bid=book.id, fmt='epub') }}">
+        <svg class="ico"><use href="#i-download"/></svg>导出 EPUB
+      </a>
+      <details class="book-menu-wrap" style="position:relative;top:auto;right:auto;opacity:1">
+        <summary class="book-menu" style="position:static;opacity:1;width:38px;height:38px" title="更多操作" aria-label="更多操作">
+          <svg class="ico"><use href="#i-more"/></svg>
+        </summary>
+        <div class="book-menu-pop" style="top:42px;right:auto;left:0">
+          <a href="{{ url_for('export_book', bid=book.id, fmt='txt') }}"><svg class="ico sm"><use href="#i-download"/></svg>导出 TXT</a>
+          <a href="{{ url_for('export_book', bid=book.id, fmt='md') }}"><svg class="ico sm"><use href="#i-download"/></svg>导出 Markdown</a>
+          {% if book.url %}<a href="{{ url_for('switch_source', bid=book.id) }}"><svg class="ico sm"><use href="#i-refresh"/></svg>换源阅读（找同名）</a>{% endif %}
+          <form method="post" action="{{ url_for('delete_book', bid=book.id) }}" onsubmit="return confirm('确定删除这本书及其全部章节？')">
+            <button type="submit" class="danger"><svg class="ico sm"><use href="#i-trash"/></svg>删除这本书</button>
+          </form>
+        </div>
+      </details>
     </div>
   </div>
 </div>
 
-<div class="toc">
+{% if progress and progress_ch %}
+<div class="progress-card">
+  <div class="pc-icon"><svg class="ico"><use href="#i-book-open"/></svg></div>
+  <div class="pc-body">
+    <div class="pc-kicker">上次读到</div>
+    <div class="pc-title">
+      {% if progress_vol %}{{ progress_vol }} · {% endif %}{{ progress_ch.title | zh }}
+    </div>
+    <div class="progress" style="max-width:320px"><i style="width:{{ ((100 * (progress.chapter_idx + 1) / n_all) | round | int) if n_all else 0 }}%"></i></div>
+  </div>
+  <div class="pc-right">
+    <span class="pc-pct">{{ ((100 * (progress.chapter_idx + 1) / n_all) | round | int) if n_all else 0 }}%</span>
+    <a class="btn btn-accent" href="{{ url_for('read', bid=book.id, idx=progress.chapter_idx) }}">接着读</a>
+  </div>
+</div>
+{% endif %}
+
+<aside class="cast-note" data-cast="shiori">
+  <span class="cn-face">
+    <img src="{{ url_for('static', filename='cast/shiori-face.jpg') }}" alt="" width="52" height="52">
+  </span>
+  <div class="cn-body">
+    <div class="cn-kicker">栞 · 图书委员</div>
+    {% if progress and progress_ch %}
+      {% set read_no = progress.chapter_idx + 1 %}
+      {% set left = n_all - read_no %}
+      <p class="cn-line">
+        上次读到第 <b>{{ read_no }}</b> 章{% if left > 0 %}，还剩 <b>{{ left }}</b> 章{% else %}，已经是最后一章了{% endif %}。
+        {% if left > 0 %}今天要一鼓作气吗？{% else %}读完记得回来告诉我结局～{% endif %}
+      </p>
+    {% elif n_done %}
+      <p class="cn-line">全 <b>{{ n_all }}</b> 章都准备好了，从第一章开始吧～我会在书签那页等你。</p>
+    {% else %}
+      <p class="cn-line">这本书还没有正文。点上面的「补抓未完成章节」，我去源站把剩下的搬回来。</p>
+    {% endif %}
+  </div>
+  <span class="cn-tag">{{ n_vols }} 卷 · {{ n_all }} 章</span>
+</aside>
+
+<div class="chapters-wrap">
   {% for vol_idx, vol_title, chs in groups %}
-  <section class="toc-vol">
-    <h2>{{ vol_title }}</h2>
-    <ol class="toc-list">
-      {% for ch in chs %}
-      <li class="{% if ch.idx == (progress.chapter_idx if progress else -1) %}current{% endif %}{% if not ch.words %} empty{% endif %}">
-        <a href="{{ url_for('read', bid=book.id, idx=ch.idx) }}">
-          <span class="toc-title">{{ ch.title | zh }}</span>
-          {% if not ch.words %}<span class="tag">未抓取</span>{% endif %}
-        </a>
-      </li>
-      {% endfor %}
-    </ol>
-  </section>
+  <div class="vol-head">
+    <h3>{{ vol_title }}</h3>
+    <span class="tag">{{ chs | length }} 章</span>
+    <span class="line"></span>
+  </div>
+  <div class="chapters">
+    {% for ch in chs %}
+    <a class="ch {% if ch.idx == (progress.chapter_idx if progress else -1) %}on{% endif %}{% if not ch.words %} missing{% endif %}"
+       href="{{ url_for('read', bid=book.id, idx=ch.idx) }}">
+      <span class="num">{{ '%02d' % (ch.idx + 1) }}</span>
+      <span class="name">{{ ch.title | zh }}</span>
+      {% if not ch.words %}<span class="tag">未抓取</span>{% endif %}
+    </a>
+    {% endfor %}
+  </div>
   {% endfor %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  var desc = document.getElementById('bookDesc');
+  var btn = document.getElementById('descToggle');
+  if (!desc || !btn) return;
+  btn.addEventListener('click', function () {
+    var open = desc.classList.toggle('open');
+    btn.textContent = open ? '收起简介' : '展开全部简介';
+  });
+})();
+</script>
 {% endblock %}

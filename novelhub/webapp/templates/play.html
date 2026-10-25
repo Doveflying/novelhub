@@ -7,10 +7,12 @@
          data-src="{{ ep.url }}"
          data-source="{{ info.source }}" data-sid="{{ info.source_id }}"
          data-epi="{{ ep_i }}" data-total="{{ eps | length }}"
+         data-epno="{{ ep.episode or (ep_i + 1) }}"
          data-eptitle="{{ ep.name }}" data-road="{{ info.roads[road_i].road }}"
          data-anime="{{ info.title }}"
          data-pos="{{ progress.position if progress and progress.ep_idx == ep_i else 0 }}"></video>
   <canvas id="danmuLayer" class="danmu-layer"></canvas>
+  <canvas id="a4kLayer" class="a4k-layer" hidden></canvas>
   <p class="player-status muted small" id="playerStatus">正在准备播放…</p>
 </div>
 
@@ -21,6 +23,10 @@
   <span class="dm-status muted small" id="dmStatus">未加载</span>
   <button class="btn ghost small" type="button" id="dmReload">重新匹配</button>
   <button class="btn ghost small" type="button" id="dmSettings">弹幕设置</button>
+  <label class="dm-toggle" title="Anime4K 实时锐化（WebGL）">
+    <input type="checkbox" id="a4kEnabled"> 超分
+  </label>
+  <span class="dm-status muted small" id="a4kStatus"></span>
 </div>
 
 <div class="dm-panel" id="dmPanel" hidden>
@@ -81,4 +87,6 @@
 <script src="{{ url_for('static', filename='player.js') }}{{ '?v=' ~ asset_v }}"></script>
 <script src="{{ url_for('static', filename='danmaku.js') }}{{ '?v=' ~ asset_v }}"></script>
 <script src="{{ url_for('static', filename='danmu-ui.js') }}{{ '?v=' ~ asset_v }}"></script>
+<script src="{{ url_for('static', filename='anime4k.js') }}{{ '?v=' ~ asset_v }}"></script>
+<script src="{{ url_for('static', filename='a4k-ui.js') }}{{ '?v=' ~ asset_v }}"></script>
 {% endblock %}

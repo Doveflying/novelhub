@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>logo 预览</title>
+<style>
+  body { margin:0; padding:32px 40px; background:#fff6f9; font-family:"PingFang SC","Microsoft YaHei",sans-serif; color:#2c2340; }
+  h2 { font-size:13px; letter-spacing:.2em; color:#7e6f92; margin:28px 0 12px; font-weight:600; }
+  .row { display:flex; align-items:flex-end; gap:22px; flex-wrap:wrap; }
+  .cell { text-align:center; font-size:10px; color:#7e6f92; }
+  .cell img { display:block; margin:0 auto 6px; }
+  .sq { width:42px; height:42px; border-radius:14px; background:linear-gradient(135deg,#ff4f87,#ff7a6b 52%,#ffb347); display:grid; place-items:center; box-shadow:0 10px 20px -10px rgba(255,79,135,.9); transform:rotate(-6deg); }
+  .sq img { width:62%; height:62%; }
+  .mini { width:34px; height:34px; border-radius:11px; background:linear-gradient(135deg,#ff4f87,#ff7a6b 52%,#ffb347); display:grid; place-items:center; }
+  .mini img { width:60%; height:60%; }
+  .dark { background:#14151f; padding:18px; border-radius:14px; display:flex; gap:18px; align-items:center; }
+  .light { background:#fff; padding:18px; border-radius:14px; border:1px solid #f4dfe9; display:flex; gap:18px; align-items:center; }
+</style></head>
+<body>
+  <h2>标记 mark.svg · 纯白版（叠在渐变上）</h2>
+  <div class="row">
+    <div class="cell"><img src="../novelhub/webapp/static/brand/mark.svg" width="16" height="16">16</div>
+    <div class="cell"><img src="../novelhub/webapp/static/brand/mark.svg" width="24" height="24">24</div>
+    <div class="cell"><img src="../novelhub/webapp/static/brand/mark.svg" width="32" height="32">32</div>
+    <div class="cell"><img src="../novelhub/webapp/static/brand/mark.svg" width="48" height="48">48</div>
+    <div class="cell"><img src="../novelhub/webapp/static/brand/mark.svg" width="72" height="72">72</div>
+  </div>
+
+  <h2>应用图标 favicon.svg</h2>
+  <div class="row">
+    <div class="cell"><img src="../novelhub/webapp/static/brand/favicon.svg" width="16" height="16">16</div>
+    <div class="cell"><img src="../novelhub/webapp/static/brand/favicon.svg" width="24" height="24">24</div>
+    <div class="cell"><img src="../novelhub/webapp/static/brand/favicon.svg" width="32" height="32">32</div>
+    <div class="cell"><img src="../novelhub/webapp/static/brand/favicon.svg" width="48" height="48">48</div>
+    <div class="cell"><img src="../novelhub/webapp/static/brand/favicon.svg" width="96" height="96">96</div>
+  </div>
+
+  <h2>实际外壳里的样子（渐变方块 + 白标）</h2>
+  <div class="row">
+    <div class="sq"><img src="../novelhub/webapp/static/brand/mark.svg" alt=""></div>
+    <div class="mini"><img src="../novelhub/webapp/static/brand/mark.svg" alt=""></div>
+    <div class="light"><img src="../novelhub/webapp/static/brand/lockup.svg" height="56" alt=""></div>
+    <div class="dark"><img src="../novelhub/webapp/static/brand/lockup.svg" height="56" alt="" style="filter:invert(1) hue-rotate(180deg)"></div>
+  </div>
+
+  <h2>横版 lockup.svg</h2>
+  <img src="../novelhub/webapp/static/brand/lockup.svg" width="360" alt="">
+</body></html>

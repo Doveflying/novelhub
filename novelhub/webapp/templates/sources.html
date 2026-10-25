@@ -1,13 +1,21 @@
 {% extends "base.html" %}
 {% block title %}源管理{% endblock %}
 {% block content %}
-<h1 class="page-title">源管理</h1>
-<p class="muted small">
-  Venera 兼容的 JS 源，一共 {{ rows | length }} 个，已安装 {{ installed_count }} 个，启用 {{ enabled_count }} 个。
-  启用的源会参与漫画聚合搜索。
-  <a class="btn sm ghost" href="{{ url_for('sources_rank') }}">看源排行榜（哪个源真能用）</a>
-</p>
+<div class="page-head">
+  <div>
+    <div class="eyebrow">Sources</div>
+    <h1 class="page-title">源管理</h1>
+    <p class="page-sub">
+      Venera 兼容的 JS 源，一共 {{ rows | length }} 个，已安装 {{ installed_count }} 个，启用 {{ enabled_count }} 个。
+      启用的源会参与漫画聚合搜索。
+    </p>
+  </div>
+  <div class="page-head-actions">
+    <a class="btn btn-ghost" href="{{ url_for('sources_rank') }}">看源排行榜（哪个源真能用）</a>
+  </div>
+</div>
 
+<div class="table-wrap">
 <table class="src-table">
   <thead>
     <tr><th>源</th><th>key</th><th>版本</th><th>状态</th><th>操作</th></tr>
@@ -39,4 +47,5 @@
   {% endfor %}
   </tbody>
 </table>
+</div>
 {% endblock %}

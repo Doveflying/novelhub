@@ -1,0 +1,209 @@
+/* 书萤 · 移动端收尾层
+ *
+ * 为什么单独一个文件、还必须最后加载：
+ *   style.css → ui.css → otaku.css →（页面级）chat.css
+ * 每层都有更具体的选择器（.theme-row .swatch、.btn.btn-sm …），
+ * 也有直接写在元素上的内联 style（阅读页的字号按钮 height:32px）。
+ * 想在这些之上统一「手机触控目标不小于 36–40px」，只有两条路：
+ * 抬选择器优先级，或者 !important。
+ * 内联样式只能靠 !important 压过去，所以这里统一用它 —— 集中在一个
+ * 明确标注为「移动端收尾」的文件里，比散落在各层的 !important 好维护。
+ *
+ * 只做移动端：所有规则都在 @media (pointer: coarse) 或 max-width 里，
+ * 桌面鼠标操作的手感完全不变。
+ */
+
+/* ==========================================================================
+   1. 安全区 / 视口
+   ========================================================================== */
+:root {
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  /* pwa.js 把真实 innerHeight/100 写进 --vh；没有 JS 时退回 1vh */
+  --app-h: calc(var(--vh, 1vh) * 100);
+}
+
+.appbar { padding-top: max(10px, var(--safe-t)); }
+
+.tabbar {
+  padding-bottom: var(--safe-b);
+  padding-left: max(0px, var(--safe-l));
+  padding-right: max(0px, var(--safe-r));
+}
+
+.reader-top { padding-top: max(8px, var(--safe-t)); }
+.reader-dock { padding-bottom: max(10px, var(--safe-b)); }
+
+.drawer { padding-top: var(--safe-t); }
+
+.settings-pop {
+  max-height: calc(var(--app-h) - 120px - var(--safe-t) - var(--safe-b));
+  overflow-y: auto;
+}
+
+/* 装到主屏后没有浏览器地址栏，顶部空隙可以更紧 */
+.standalone .appbar { padding-top: max(6px, var(--safe-t)); }
+
+/* ==========================================================================
+   2. 触控目标
+   规则：可见的交互元素热区 ≥ 36px；主要导航 ≥ 40px。
+   ========================================================================== */
+@media (max-width: 760px), (pointer: coarse) {
+  .dock-btn,
+  .icon-btn,
+  .tabbar a,
+  .tabbar button,
+  /* 底部导航实际用的是 .tab，它的 height 规则优先级比 .tabbar a 高 */
+  .tab,
+  .tabbar .tab {
+    min-height: 44px !important;
+    min-width: 44px !important;
+  }
+
+  /* 书架工具栏的下拉筛选 */
+  .selectbtn {
+    min-height: 40px !important;
+  }
+
+  /* 底部浮层（sheet）里的主题切换 / 快捷入口：原来写死 height:38px，
+     手机上点起来偏窄。.sheet-themes button 和 .sheet-item 都要撑起来。 */
+  .sheet-themes button,
+  .sheet-item,
+  .sheet button {
+    min-height: 44px !important;
+    height: auto !important;
+  }
+
+  /* 分段选择器（书架筛选 / 动漫分组 / 主题切换） */
+  .seg button {
+    height: 40px !important;
+    padding: 0 14px !important;
+  }
+
+  /* 历史页的分类 tab（.tabs button）：原来是 30px 的小胶囊 */
+  .tabs button,
+  .tabs a {
+    min-height: 40px !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
+  /* 小号按钮：视觉保持紧凑，热区撑起来 */
+  .btn.sm,
+  .btn-sm {
+    min-height: 40px !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
+  .btn,
+  .btn-accent,
+  .btn-ghost {
+    min-height: 44px !important;
+  }
+
+  /* 阅读页字号/行距按钮是内联 height:32px，只能 !important */
+  .font-opt {
+    height: 40px !important;
+    min-height: 40px !important;
+  }
+
+  /* 主题色块 */
+  .swatch,
+  .theme-row .swatch {
+    padding-top: 10px !important;
+    padding-bottom: 10px !important;
+    min-height: 40px !important;
+  }
+
+  /* 正文里的行内小链接（换源 / 删除 / 重试）：字还是小字，
+     用负外边距换纵向内边距，视觉不变但按得中 */
+  .link-btn {
+    font-size: 12px !important;
+    padding: 11px 6px !important;
+    margin: -11px 0 !important;
+  }
+
+  /* 聊天工具栏 + 快捷回复气泡 */
+  .im-btn {
+    width: 40px !important;
+    height: 40px !important;
+  }
+  .im-chips button {
+    min-height: 40px !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+  }
+  .im-send {
+    min-width: 44px !important;
+    min-height: 44px !important;
+  }
+
+  /* 看板娘关闭键：22px 太难点，外扩热区但不改视觉中心。
+     它 position:absolute 在头像角上，放大后仍要保持角落对齐。 */
+  .mascot-x {
+    width: 44px !important;
+    height: 44px !important;
+    top: -10px !important;
+    right: -10px !important;
+  }
+
+  /* 章节行 */
+  .ch {
+    padding-top: 12px !important;
+    padding-bottom: 12px !important;
+  }
+}
+
+/* ==========================================================================
+   3. 输入框字号
+   iOS Safari 在输入框字号 < 16px 时会自动放大整页，且不会缩回去。
+   ========================================================================== */
+@media (max-width: 760px), (pointer: coarse) {
+  input[type="text"],
+  input[type="search"],
+  input[type="url"],
+  input[type="number"],
+  input[type="email"],
+  input[type="password"],
+  input[type="tel"],
+  textarea,
+  select,
+  .im-input,
+  .search-box input,
+  .crawl-form input,
+  .import-form input {
+    font-size: 16px !important;
+  }
+}
+
+/* ==========================================================================
+   4. 正文排版与溢出
+   ========================================================================== */
+@media (max-width: 760px) {
+  .reader-body {
+    padding-left: max(18px, var(--safe-l));
+    padding-right: max(18px, var(--safe-r));
+  }
+
+  .drawer { width: min(88vw, 340px); }
+
+  .reader-body pre,
+  .reader-body code { overflow-x: auto; }
+  .reader-body img { max-width: 100%; height: auto; }
+
+  .books { gap: 12px; }
+}
+
+/* ==========================================================================
+   5. 横屏手机：把纵向空间还给正文
+   ========================================================================== */
+@media (max-width: 900px) and (orientation: landscape) {
+  .shelf-hero { padding-top: 16px; padding-bottom: 14px; }
+  .hero-art { display: none; }
+}
+
+/* 独立窗口里藏掉「用浏览器打开」类提示 */
+.standalone .browser-only { display: none !important; }

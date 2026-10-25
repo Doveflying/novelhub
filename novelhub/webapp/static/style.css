@@ -689,3 +689,18 @@ html[data-theme="night"] .refresh-bar { box-shadow: 0 8px 26px rgba(0, 0, 0, 0.5
 /* 导航栏刷新键：点下去转一圈，表示正在重载 */
 @keyframes nh-spin { to { transform: rotate(360deg); } }
 .icon-btn.spinning { animation: nh-spin 0.6s linear infinite; }
+
+/* ---- Anime4K 超分画布 ----
+   盖在 video 上、弹幕层之下。video 用 visibility:hidden 隐藏而不是 display:none，
+   否则部分浏览器会停止解码，就拿不到新帧了。
+   位置和尺寸由 a4k-ui.js 按 video 的真实渲染框算出（object-fit 对 canvas 无效），
+   这里只管层级和默认隐藏。 */
+.a4k-layer {
+  position: absolute;
+  left: 0; top: 0;
+  pointer-events: none;
+  z-index: 1;
+  background: #000;
+}
+.a4k-layer:not(.on) { display: none; }
+.player-wrap { position: relative; }

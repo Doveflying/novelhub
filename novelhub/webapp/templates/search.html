@@ -1,7 +1,13 @@
 {% extends "base.html" %}
 {% block title %}搜索{% if q %} “{{ q }}”{% endif %}{% endblock %}
 {% block content %}
-<h1 class="page-title">搜索{% if q %}：{{ q }}{% endif %}</h1>
+<div class="page-head">
+  <div>
+    <div class="eyebrow">Search</div>
+    <h1 class="page-title">搜索{% if q %}：{{ q }}{% endif %}</h1>
+    <p class="page-sub">本地书架 + 在线源一起查；上面可以自己勾选参与搜索的源。</p>
+  </div>
+</div>
 
 {% if q %}
 <div class="tabs">

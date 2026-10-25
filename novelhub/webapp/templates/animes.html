@@ -1,7 +1,25 @@
 {% extends "base.html" %}
 {% block title %}动漫{% endblock %}
 {% block content %}
-<h1 class="page-title">动漫书架 <small class="muted">{{ items | length }} 部</small></h1>
+<section class="cast-banner" data-cast="miku">
+  <div class="cb-copy">
+    <div class="cb-kicker"><svg class="ico"><use href="#i-play"/></svg> ANIME CLUB</div>
+    <h1 class="cb-title">动漫书架 <small>{{ items | length }} 部</small></h1>
+    <p class="cb-sub">美玖会记住你看到第几集，<b>播放进度、线路和弹幕</b>都帮你留着。别攒番哦。</p>
+    <div class="cb-actions">
+      <a class="btn btn-accent" href="{{ url_for('search', q='', kind='anime') }}">搜番剧</a>
+      <a class="btn btn-ghost" href="{{ url_for('search', q='进击的巨人', kind='anime') }}">用「进击的巨人」试试</a>
+    </div>
+  </div>
+  <div class="cb-art" aria-hidden="true">
+    <span class="cb-ring"></span>
+    <div class="cb-bubble speech">
+      <span class="hb-name">美玖 <em>追番担当</em></span>
+      <p>{{ '耳机戴好，今晚就交给这一部！' if items else '收藏空空的，先去搜一部？' }}</p>
+    </div>
+    <figure class="cb-portrait"><img src="{{ url_for('static', filename='cast/miku.jpg') }}" alt="" width="720" height="913"></figure>
+  </div>
+</section>
 
 <form class="searchbar wide" action="{{ url_for('search') }}" method="get">
   <input type="hidden" name="kind" value="anime">

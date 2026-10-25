@@ -11,12 +11,33 @@ from urllib.parse import urljoin
 
 from ..config import Config
 from ..net import Fetcher
+from .. import paths
 
-ROOT = Path(__file__).resolve().parent.parent.parent
+# 只读：随程序发布的 refs/venera（索引、内置源、runner）
+ROOT = paths.resource_root()
 SOURCES_DIR = ROOT / "refs" / "venera" / "sources"
-RUNNER = Path(__file__).resolve().parent.parent / "jsruntime" / "runner.mjs"
+RUNNER = paths.resource("jsruntime", "runner.mjs")
 INDEX_URL = "https://cdn.jsdelivr.net/gh/venera-app/venera-configs@main/index.json"
 SOURCE_URL = "https://cdn.jsdelivr.net/gh/venera-app/venera-configs@main/{file}"
+
+
+def _writable_sources_dir() -> Path:
+    """用户新装的源要写盘：冻结后 refs/ 在只读包里，得落到数据目录。"""
+    if paths.is_frozen():
+        p = paths.data_root() / "data" / "venera" / "sources"
+        p.mkdir(parents=True, exist_ok=True)
+        return p
+    SOURCES_DIR.mkdir(parents=True, exist_ok=True)
+    return SOURCES_DIR
+
+
+def _source_file(name: str) -> Path | None:
+    """先找用户安装目录，再找随包内置目录。"""
+    for base in (_writable_sources_dir(), SOURCES_DIR):
+        p = base / name
+        if p.exists() and p.stat().st_size > 500:
+            return p
+    return None
 
 
 @dataclass
@@ -34,7 +55,7 @@ class VeneraRegistry:
     def __init__(self, cfg: Config):
         self.cfg = cfg
         self.index_file = ROOT / "refs" / "venera" / "configs-index.json"
-        SOURCES_DIR.mkdir(parents=True, exist_ok=True)
+        self.sources_dir = _writable_sources_dir()
 
     def index(self) -> list[SourceEntry]:
         entries: list[SourceEntry] = []
@@ -64,11 +85,15 @@ class VeneraRegistry:
                         description=item.get("description", ""),
                     )
                 )
-        # 本地额外安装的源（比如用户丢进来的仓库压缩包）
-        for p in sorted(SOURCES_DIR.glob("*.js")):
-            if p.name.lower() in seen:
+        # 本地额外安装的源（比如用户丢进来的仓库压缩包），用户目录优先
+        local_files: dict[str, Path] = {}
+        for base in (self.sources_dir, SOURCES_DIR):
+            for p in sorted(base.glob("*.js")):
+                local_files.setdefault(p.name.lower(), p)
+        for lname, p in local_files.items():
+            if lname in seen:
                 continue
-            seen.add(p.name.lower())
+            seen.add(lname)
             entries.append(self._entry_from_file(p))
         return entries
 
@@ -98,24 +123,24 @@ class VeneraRegistry:
         entry = next((e for e in self.index() if e.key == key), None)
         if entry is None:
             # 允许直接用文件名（ManHuaGui.js -> ManHuaGui）
-            local = SOURCES_DIR / f"{key}.js"
-            if local.exists():
-                return local
+            found = _source_file(f"{key}.js")
+            if found is not None:
+                return found
             raise RuntimeError(f"清单里没有源：{key}")
-        target = SOURCES_DIR / entry.file
-        if not target.exists() or target.stat().st_size < 500:
-            if entry.file and (ROOT / "refs" / "venera" / "sources" / entry.file).exists():
-                return ROOT / "refs" / "venera" / "sources" / entry.file
-            with Fetcher(self.cfg) as f:
-                js = f.get(SOURCE_URL.format(file=entry.file), use_cache=False)
-            target.write_text(js, encoding="utf-8")
+        existing = _source_file(entry.file)
+        if existing is not None:
+            return existing
+        target = self.sources_dir / entry.file
+        with Fetcher(self.cfg) as f:
+            js = f.get(SOURCE_URL.format(file=entry.file), use_cache=False)
+        target.write_text(js, encoding="utf-8")
         return target
 
     def installed(self) -> list[tuple[SourceEntry, Path]]:
         out = []
         for e in self.index():
-            p = SOURCES_DIR / e.file
-            if p.exists() and p.stat().st_size > 500:
+            p = _source_file(e.file)
+            if p is not None:
                 out.append((e, p))
         return out
 

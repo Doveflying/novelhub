@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="paper">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#ff4f87">
+<title>离线了 · 书萤</title>
+<style>
+  :root {
+    --pink: #ff4f87;
+    --peach: #ff7a6b;
+    --amber: #ffb347;
+    --ink: #2b2131;
+    --ink-2: #6b5f74;
+    --card: #fffdfe;
+    --line: rgba(255, 79, 135, .16);
+    --bg: #fff6f9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink: #f3ecf6;
+      --ink-2: #b6a8c2;
+      --card: #1c1722;
+      --line: rgba(255, 122, 107, .2);
+      --bg: #14101a;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    display: grid;
+    place-items: center;
+    padding: 28px calc(20px + env(safe-area-inset-right)) calc(28px + env(safe-area-inset-bottom)) calc(20px + env(safe-area-inset-left));
+    background:
+      radial-gradient(1200px 620px at 50% -10%, rgba(255, 79, 135, .13), transparent 62%),
+      var(--bg);
+    color: var(--ink);
+    font: 15px/1.7 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+          "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -webkit-text-size-adjust: 100%;
+  }
+  .card {
+    width: min(440px, 100%);
+    text-align: center;
+    padding: 34px 26px 28px;
+    border-radius: 22px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    box-shadow: 0 24px 60px -28px rgba(64, 24, 52, .34);
+  }
+  .mark {
+    width: 68px; height: 68px;
+    border-radius: 20px;
+    display: grid; place-items: center;
+    margin: 0 auto 18px;
+    background: linear-gradient(135deg, var(--pink), var(--peach) 55%, var(--amber));
+    box-shadow: 0 12px 26px -12px rgba(255, 79, 135, .8);
+  }
+  .mark svg { width: 38px; height: 38px; display: block; }
+  h1 { margin: 0 0 8px; font-size: 20px; letter-spacing: .2px; }
+  p { margin: 0 0 6px; color: var(--ink-2); font-size: 14px; }
+  .tip {
+    margin-top: 18px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: rgba(255, 79, 135, .07);
+    border: 1px solid var(--line);
+    font-size: 13px;
+    color: var(--ink-2);
+    text-align: left;
+  }
+  .tip b { color: var(--ink); font-weight: 600; }
+  button {
+    margin-top: 20px;
+    width: 100%;
+    padding: 12px 18px;
+    border: 0;
+    border-radius: 12px;
+    font: inherit;
+    font-weight: 600;
+    color: #fff;
+    background: linear-gradient(135deg, var(--pink), var(--peach));
+    box-shadow: 0 12px 24px -14px rgba(255, 79, 135, .95);
+    cursor: pointer;
+  }
+  button:active { transform: translateY(1px); }
+  button:focus-visible { outline: 2px solid var(--pink); outline-offset: 3px; }
+</style>
+</head>
+<body>
+  <main class="card">
+    <div class="mark" aria-hidden="true">
+      <svg viewBox="0 0 48 48" fill="none">
+        <circle cx="24" cy="11.4" r="7.4" fill="#fff" opacity=".2"/>
+        <circle cx="24" cy="11.4" r="3.3" fill="#fff"/>
+        <path d="M23.2 21.9c-4.5-4-10.4-5.5-14.5-4.3a1 1 0 0 0-.7.95v15.8c0 .75.79 1.23 1.45.92 3.7-1.2 9.2-.08 13.9 3.42.2.15.42.22.63.22V21.9Z" fill="#fff"/>
+        <g transform="translate(48 0) scale(-1 1)">
+          <path d="M23.2 21.9c-4.5-4-10.4-5.5-14.5-4.3a1 1 0 0 0-.7.95v15.8c0 .75.79 1.23 1.45.92 3.7-1.2 9.2-.08 13.9 3.42.2.15.42.22.63.22V21.9Z" fill="#fff"/>
+        </g>
+      </svg>
+    </div>
+    <h1>这一页还没进缓存</h1>
+    <p>网络断了，书萤暂时够不到服务。</p>
+    <div class="tip">
+      <b>已经读过的章节不受影响。</b><br>
+      书架、目录和正文都在本机，恢复网络或回到电脑旁就能接着看。
+    </div>
+    <button type="button" onclick="location.reload()">重试</button>
+  </main>
+</body>
+</html>

@@ -1,0 +1,631 @@
+/* ==========================================================================
+   轻库 · 聊天（和 Agent 伙伴说话）
+   沿用 ui.css 的 design token；本文件只负责「即时通讯」这一页的形状。
+   规矩：整页只有一条彩色轴（我说的话 + 发送键），别处一律走 surface 阶梯和 hairline。
+   ========================================================================== */
+
+/* ---------- 1. 让这一页变成不滚动的 IM 骨架 ---------- */
+body.chat-page { overflow: hidden; }
+body.chat-page .app { min-height: 0; height: 100vh; height: 100dvh; }
+body.chat-page .shell { min-height: 0; height: 100vh; height: 100dvh; }
+body.chat-page .footer,
+body.chat-page .mascot { display: none; }
+
+.main-chat {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+}
+
+/* ---------- 2. 楼层 ---------- */
+.im {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  background: var(--bg);
+}
+
+/* ---------- 2.1 管家列表（左栏） ---------- */
+.im-roster {
+  flex: 0 0 248px;
+  width: 248px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 8px 14px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--surface);
+  border-right: 1px solid var(--line);
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+.im-roster::-webkit-scrollbar { width: 8px; }
+.im-roster::-webkit-scrollbar-thumb { background: var(--line-strong); border: 2px solid var(--surface); border-radius: 99px; }
+
+.im-roster-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 8px 8px;
+  font-size: 11px;
+  letter-spacing: .16em;
+  color: var(--muted);
+}
+.im-roster-head em {
+  font-style: normal;
+  padding: 0 5px;
+  border-radius: 6px;
+  background: var(--surface-2);
+  font-size: 10px;
+  letter-spacing: 0;
+}
+
+.imc {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 9px;
+  border-radius: 11px;
+  text-decoration: none;
+  color: inherit;
+  transition: background .14s;
+}
+.imc:hover { background: var(--surface-2); }
+.imc.on { background: var(--surface-2); }
+.imc.on::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 11px;
+  bottom: 11px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--c, var(--accent));
+}
+
+.imc-face {
+  position: relative;
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: var(--surface-3);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c, var(--line)) 26%, transparent);
+}
+.imc-face img { width: 100%; height: 100%; object-fit: cover; object-position: center 13%; display: block; }
+.imc-mono {
+  font-family: var(--font-serif);
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--c, var(--accent));
+}
+.imc-live {
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--jade);
+  box-shadow: 0 0 0 2px var(--surface);
+}
+.imc-live.off { background: var(--muted); opacity: .6; }
+.imc.on .imc-live { box-shadow: 0 0 0 2px var(--surface-2); }
+
+.imc-body { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.imc-top { display: flex; align-items: baseline; gap: 6px; }
+.imc-top b {
+  font-family: var(--font-serif);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.imc-top em {
+  font-style: normal;
+  font-size: 10px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.imc-status {
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+/* 注意：class 里别用 main —— ui.css 的全局 .main（max-width/padding）会跟着套上 */
+.imc.is-main .imc-top b { color: var(--accent); }
+
+.im-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 顶栏：头像 + 名字 + 在线状态，一条 hairline 收边 */
+.im-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 13px clamp(14px, 3vw, 28px);
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+
+.im-ava {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-family: var(--font-serif);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1;
+  user-select: none;
+}
+.im-ava.lg { width: 52px; height: 52px; border-radius: 14px; font-size: 24px; }
+/* 头像原图有竖构图（宫城那张 612×1676），裁切窗口往上提，脸才不会被裁掉 */
+.im-ava img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 13%;
+  display: block;
+  border-radius: inherit;
+}
+.im-jp {
+  font-style: normal;
+  font-family: var(--font-jp);
+  font-size: 10.5px;
+  letter-spacing: .08em;
+  color: var(--muted);
+  margin-left: 3px;
+}
+
+.im-ava.me {
+  background: var(--surface-3);
+  color: var(--ink-2);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.im-who { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.im-name {
+  font-family: var(--font-serif);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: .01em;
+  color: var(--ink);
+  line-height: 1.2;
+}
+.im-sub {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-style: normal;
+  font-size: 11.5px;
+  color: var(--muted);
+  line-height: 1.3;
+  white-space: nowrap;
+}
+.im-sep { opacity: .55; }
+
+/* 在线点：不是装饰，是状态 */
+.im-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--jade);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--jade) 18%, transparent);
+}
+.im[data-busy="1"] .im-dot { background: var(--amber); box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber) 20%, transparent); }
+.im.warn .im-dot { background: var(--danger); box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 18%, transparent); }
+
+.im-tag {
+  margin-left: 2px;
+  padding: 1px 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  font-size: 10px;
+  letter-spacing: .04em;
+  color: var(--muted);
+}
+
+.im-acts { margin-left: auto; display: flex; gap: 6px; }
+.im-btn {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background .14s, color .14s;
+}
+.im-btn:hover { background: var(--surface-2); color: var(--ink); }
+.im-btn:disabled { opacity: .4; cursor: default; }
+.im-btn.arm {
+  width: auto;
+  padding: 0 11px 0 9px;
+  gap: 6px;
+  display: inline-flex;
+  align-items: center;
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--danger);
+  font-size: 11.5px;
+}
+.im-btn.arm::after { content: "确认清空"; white-space: nowrap; }
+
+/* ---------- 3. 对话流 ---------- */
+.im-thread {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+  padding: 20px clamp(12px, 3vw, 28px) 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  scroll-padding-bottom: 12px;
+}
+.im-thread::-webkit-scrollbar { width: 9px; }
+.im-thread::-webkit-scrollbar-track { background: transparent; }
+.im-thread::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border: 3px solid var(--bg);
+  border-radius: 99px;
+}
+.im-thread::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+/* 消息内外一律 760px 上下的测量宽度，宽屏也不会拉成一条长线 */
+.im-row,
+.im-sys,
+.im-time,
+.im-intro { width: 100%; max-width: 760px; margin-inline: auto; }
+
+.im-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 2px 0;
+}
+.im-row + .im-row { padding-top: 2px; }
+.im-row.me { flex-direction: row-reverse; }
+
+/* 连续同一个人说话时收紧，只留一点呼吸 */
+.im-row.same { padding-top: 0; }
+.im-row.same .im-ava { visibility: hidden; }
+
+.im-bubble {
+  position: relative;
+  max-width: 40em;        /* 40em ≈ 580px，中文一行 40 字左右，再宽就难读了 */
+  padding: 9px 13px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font-size: 14.5px;
+  line-height: 1.62;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+/* 我说的话走「反白」：ink 底 + bg 字。两种主题下对比度都在 13:1 以上，
+   也比把签名色铺满整条气泡更耐看（签名色只留给发送键、光标和焦点环）。 */
+.im-row.me .im-bubble {
+  background: var(--ink);
+  border-color: transparent;
+  color: var(--bg);
+}
+/* 一段话的第一条把靠近头像那角收掉 —— IM 的「气泡口」 */
+.im-row.head .im-bubble { border-top-left-radius: 4px; }
+.im-row.me.head .im-bubble { border-top-left-radius: 12px; border-top-right-radius: 4px; }
+
+.im-bubble a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+.im-bubble code {
+  font-family: var(--font-mono);
+  font-size: .88em;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+}
+.im-row.me .im-bubble code { background: color-mix(in srgb, var(--bg) 20%, transparent); }
+
+.im-row.fail .im-bubble {
+  background: var(--surface);
+  border-color: color-mix(in srgb, var(--danger) 34%, var(--line));
+  color: var(--ink-2);
+}
+
+/* 时间分隔条 */
+.im-time {
+  text-align: center;
+  margin: 12px auto 8px;
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 系统行：工具调用 / 出错 / 提示 —— 居中细字，不做卡片 */
+.im-sys {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin: 6px auto;
+  font-size: 11.5px;
+  color: var(--muted);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.im-sys .ico { width: 13px; height: 13px; opacity: .8; }
+.im-sys.done { opacity: .58; }
+.im-sys.err { color: var(--danger); flex-wrap: wrap; }
+.im-sys button {
+  border: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  padding: 2px 9px;
+  border-radius: 99px;
+  cursor: pointer;
+}
+.im-sys button:hover { background: color-mix(in srgb, currentColor 10%, transparent); }
+
+/* ---------- 4. 开场 ---------- */
+.im-intro {
+  margin: auto auto;
+  padding: 8vh 0 4vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+}
+.im-hello {
+  margin: 0;
+  max-width: 34em;
+  font-family: var(--font-serif);
+  font-size: 15px;
+  line-height: 1.9;
+  color: var(--ink-2);
+  text-wrap: pretty;
+}
+.im-chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.im-chips button {
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 12.5px;
+  padding: 6px 13px;
+  border-radius: 99px;
+  cursor: pointer;
+  transition: border-color .14s, color .14s, background .14s;
+}
+.im-chips button:hover { border-color: var(--ink-2); color: var(--ink); background: var(--surface-2); }
+.im-warn {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--danger);
+  max-width: 40em;
+}
+.im-warn code {
+  font-family: var(--font-mono);
+  font-size: .92em;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--surface-2);
+}
+
+/* ---------- 5. 输入条 ---------- */
+.im-compose {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-end;
+  gap: 9px;
+  padding: 10px clamp(12px, 3vw, 28px) 4px;
+  background: var(--surface-2);
+  border-top: 1px solid var(--line);
+}
+/* 底栏和输入条之间永远不要露出一条背景色：用同色延伸到视口外 */
+.im-compose::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 140px;
+  background: var(--surface-2);
+  pointer-events: none;
+}
+.im-compose textarea {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 40px;
+  max-height: 34vh;
+  padding: 9px 13px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 14.5px;
+  line-height: 1.55;
+  resize: none;
+  overflow-y: auto;
+  scrollbar-width: none;
+  transition: border-color .14s, background .14s;
+}
+.im-compose textarea::-webkit-scrollbar { width: 0; height: 0; }
+.im-compose textarea::placeholder { color: var(--muted); opacity: .85; }
+.im-compose textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--surface);
+}
+
+.im-send {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 11px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  cursor: pointer;
+  transition: opacity .14s, transform .14s var(--ease);
+}
+.im-send svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.im-send:hover:not(:disabled) { transform: translateY(-1px); }
+.im-send:active:not(:disabled) { transform: translateY(0) scale(.97); }
+.im-send:disabled {
+  background: var(--surface-3);
+  color: var(--muted);
+  cursor: default;
+}
+/* 生成中：按钮变成「停止」，形状从箭头换成方块 */
+.im-send .i-stop { display: none; }
+.im-send[data-mode="stop"] .i-send { display: none; }
+.im-send[data-mode="stop"] .i-stop { display: block; }
+.im-send[data-mode="stop"] {
+  background: var(--surface);
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 42%, transparent);
+}
+.im-send[data-mode="stop"]:hover { background: var(--accent-soft); }
+
+.im-hint {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+  padding: 0 0 9px;
+  margin: 0;
+  background: var(--surface-2);
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: .02em;
+}
+.im-hint:empty { display: none; }
+
+/* ---------- 6. 唯一的两处动效：等字的三点 + 光标 ---------- */
+.im-typing { display: inline-flex; gap: 4px; align-items: center; height: 1.62em; }
+.im-typing i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--muted);
+  animation: im-breathe 1.15s var(--ease) infinite;
+}
+.im-typing i:nth-child(2) { animation-delay: .16s; }
+.im-typing i:nth-child(3) { animation-delay: .32s; }
+@keyframes im-breathe {
+  0%, 62%, 100% { opacity: .28; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-2px); }
+}
+
+.im-caret {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 1px;
+  vertical-align: -2px;
+  background: currentColor;
+  animation: im-caret 1.05s steps(1) infinite;
+}
+@keyframes im-caret { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .im-typing i, .im-caret { animation: none; }
+  .im-typing i { opacity: .5; }
+}
+
+/* ---------- 7. 浏览器表面 ---------- */
+body.chat-page ::selection { background: color-mix(in srgb, var(--accent) 26%, transparent); }
+body.chat-page textarea { caret-color: var(--accent); }
+body.chat-page :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+body.chat-page .im-compose textarea:focus-visible { outline: none; }
+
+/* ---------- 8. 窄屏：管家列表横过来，顶栏在这个页面收掉 ---------- */
+@media (max-width: 760px) {
+  body.chat-page .rail,
+  body.chat-page .appbar { display: none; }
+  body.chat-page .shell { margin-left: 0; height: calc(100dvh - 58px - env(safe-area-inset-bottom)); }
+  .main-chat { padding-bottom: 0; }
+
+  .im { flex-direction: column; }
+  .im-roster {
+    flex: 0 0 auto;
+    width: auto;
+    flex-direction: row;
+    gap: 6px;
+    padding: 8px 10px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    scrollbar-width: none;
+  }
+  .im-roster::-webkit-scrollbar { height: 0; }
+  .im-roster-head { display: none; }
+  .imc {
+    flex: 0 0 auto;
+    flex-direction: column;
+    gap: 4px;
+    padding: 4px 2px;
+    width: 54px;
+    border-radius: 10px;
+  }
+  .imc.on::before { left: 6px; right: 6px; top: auto; bottom: 0; width: auto; height: 2px; }
+  .imc-body { align-items: center; }
+  .imc-status { display: none; }
+  .imc-top { flex-direction: column; align-items: center; gap: 0; }
+  .imc-top em { display: none; }
+  .imc-top b { font-size: 11px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .im-bubble { max-width: 82%; }
+  .im-head { padding-top: 9px; padding-bottom: 9px; }
+  .im-thread { padding-bottom: 4px; }
+  .im-hint { display: none; }
+  .im-compose { padding-bottom: 8px; }
+  .im-intro { padding: 4vh 0 2vh; }
+}

@@ -17,7 +17,9 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
-TABLE = Path(__file__).resolve().parent / "data" / "opencc_s2t.txt"
+from . import paths
+
+TABLE = paths.resource("data", "opencc_s2t.txt")
 
 try:  # pragma: no cover - 取决于环境
     import zhconv as _zhconv

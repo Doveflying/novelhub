@@ -3,6 +3,17 @@
 {% block content %}
 <h1 class="page-title">导入本地资源</h1>
 
+<aside class="cast-note" data-cast="aju">
+  <span class="cn-face">
+    <img src="{{ url_for('static', filename='cast/aju-face.jpg') }}" alt="" width="52" height="52">
+  </span>
+  <div class="cn-body">
+    <div class="cn-kicker">小蛛 · 书源担当</div>
+    <p class="cn-line">TXT / EPUB / MD 都丢进来吧，切章我来处理——分卷、目录、编码都不用你操心。</p>
+  </div>
+  <span class="cn-tag">导入 / 整理</span>
+</aside>
+
 <div class="two-col">
   <form class="form" method="post" action="{{ url_for('import_upload') }}" enctype="multipart/form-data">
     <h2>上传文件</h2>
@@ -10,7 +21,7 @@
       <span>txt / epub / md，可多选</span>
       <input type="file" name="files" multiple accept=".txt,.epub,.md,.markdown">
     </label>
-    <button class="btn" type="submit">导入</button>
+    <button class="btn btn-accent" type="submit">导入</button>
     <p class="muted small">TXT 会自动按「第X章 / 第X话 / 序章 / 后记 / Chapter N」切章；EPUB 按 spine 顺序与目录标题切章。</p>
   </form>
 
@@ -20,7 +31,7 @@
       <span>文件或目录路径</span>
       <input type="text" name="path" placeholder="D:\novels\某本书.epub 或 D:\novels\合集">
     </label>
-    <button class="btn" type="submit">导入</button>
+    <button class="btn btn-accent" type="submit">导入</button>
     <p class="muted small">目录会递归导入其中的 txt / epub / md。</p>
   </form>
 </div>

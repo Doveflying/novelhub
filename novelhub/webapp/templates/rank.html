@@ -26,6 +26,7 @@
 {% set group = rows | selectattr('kind', 'equalto', kind) | list %}
 {% if group %}
 <h2 class="rank-h">{{ label }} <small class="muted">{{ group | length }} 个源</small></h2>
+<div class="table-wrap">
 <table class="src-table rank-table">
   <thead>
     <tr><th>#</th><th>源</th><th>分</th><th>耗时</th><th>结果</th><th>状态</th><th>聚合</th><th>说明</th><th></th></tr>
@@ -54,6 +55,7 @@
   {% endfor %}
   </tbody>
 </table>
+</div>
 {% endif %}
 {% endfor %}
 {% else %}

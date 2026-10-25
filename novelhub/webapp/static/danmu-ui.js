@@ -79,13 +79,20 @@
 
   /* ---------------- 拉弹幕 ---------------- */
   var animeTitle = v.dataset.anime || '';
-  var epNo = (parseInt(v.dataset.epi, 10) || 0) + 1;
+  /* 优先用分集名里抠出来的真实集号；抠不到才退回列表下标 +1。
+     下标当集号在分集乱序、含总集篇/OVA 时会把弹幕串到别的集上。 */
+  var epNo = parseInt(v.dataset.epno, 10) ||
+             (parseInt(v.dataset.epi, 10) || 0) + 1;
 
   function loadDanmu() {
     if (!animeTitle) { say('无番名，跳过弹幕'); return; }
     say('正在匹配弹幕…');
     var url = '/api/danmu?anime=' + encodeURIComponent(animeTitle) +
               '&ep=' + encodeURIComponent(epNo);
+    /* 把集名也带上：弹弹play 的分集里混着总集篇/OVA，
+       光靠集号会错位，服务端会用集名做二次对齐 */
+    var epTitle = v.dataset.eptitle || '';
+    if (epTitle) url += '&eptitle=' + encodeURIComponent(epTitle);
     fetch(url, { credentials: 'same-origin' })
       .then(function (r) { return r.json(); })
       .then(function (j) {

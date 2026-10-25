@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}{{ persona.name }} · 书萤{% endblock %}
+{% block crumb %}聊天{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='chat.css') }}{{ '?v=' ~ asset_v }}">{% endblock %}
+{% block bodyclass %}chat-page{% endblock %}
+{% block mainclass %}main main-chat{% endblock %}
+
+{% block content %}
+<section class="im" id="im"
+         data-who="{{ who }}"
+         data-name="{{ persona.name }}"
+         data-ready="{{ '1' if ready else '0' }}">
+
+  <aside class="im-roster" aria-label="管家列表">
+    <div class="im-roster-head">
+      <span>管家</span>
+      <em>{{ roster | length }}</em>
+    </div>
+    {% for p in roster %}
+    <a class="imc {{ 'on' if p.id == who }} {{ 'is-main' if p.kind == 'main' }}"
+       href="{{ url_for('chat_page', who=p.id) }}" data-who="{{ p.id }}"
+       style="--c: {{ p.color }}" title="{{ p.name }} · {{ p.role }}">
+      <span class="imc-face">
+        {% if p.avatar %}
+        <img src="{{ url_for('static', filename='cast/' ~ p.avatar ~ '-face.jpg') }}" alt="" width="38" height="38">
+        {% else %}
+        <span class="imc-mono">宫</span>
+        {% endif %}
+        <i class="imc-live {{ 'off' if not p.ready }}"></i>
+      </span>
+      <span class="imc-body">
+        <span class="imc-top"><b>{{ p.name }}</b><em>{{ p.role }}</em></span>
+        <span class="imc-status">{{ p.status }}</span>
+      </span>
+    </a>
+    {% endfor %}
+  </aside>
+
+  <div class="im-main">
+    <header class="im-head">
+      <span class="im-ava" aria-hidden="true">
+        {% if persona.avatar %}
+        <img src="{{ url_for('static', filename='cast/' ~ persona.avatar ~ '-face.jpg') }}" alt="" width="34" height="34">
+        {% else %}<span class="imc-mono">宫</span>{% endif %}
+      </span>
+      <span class="im-who">
+        <b class="im-name">{{ persona.name }} <em class="im-jp">{{ persona.jp }}</em></b>
+        <em class="im-sub">
+          <i class="im-dot" id="imDot"></i>
+          <span id="imState">{{ '在线' if ready else '未接通' }}</span>
+          <span class="im-sep">·</span>{{ persona.role }}
+          {%- if conf.model %}<span class="im-sep">·</span>{{ conf.model }}{% endif -%}
+          {%- if persona.provider == 'deepseek' and conf.source == 'qqbot' %}<span class="im-tag" title="和 QQ 那边用的是同一份配置">同 QQ</span>{% endif -%}
+        </em>
+      </span>
+      <div class="im-acts">
+        <button class="im-btn" id="imClear" type="button" title="清空和{{ persona.name }}的对话" aria-label="清空这段对话">
+          <svg class="ico"><use href="#i-trash"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="im-thread" id="imThread" role="log" aria-live="polite" aria-label="对话">
+      <div class="im-intro" id="imIntro">
+        <span class="im-ava lg" aria-hidden="true">
+          {% if persona.avatar %}
+          <img src="{{ url_for('static', filename='cast/' ~ persona.avatar ~ '-face.jpg') }}" alt="" width="52" height="52">
+          {% else %}<span class="imc-mono">宫</span>{% endif %}
+        </span>
+        <p class="im-hello">{{ greeting }}</p>
+        <div class="im-chips">
+          {% for c in chips %}<button type="button" data-say="{{ c }}">{{ c }}</button>{% endfor %}
+        </div>
+        {% if not ready %}
+        <p class="im-warn">这个角色的模型没接通（provider = <code>{{ persona.provider }}</code>）。
+          检查 <code>config.json</code> 的 <code>chat.providers.{{ persona.provider }}</code>
+          或环境变量 <code>{{ 'ZHIPU_API_KEY' if persona.provider == 'zhipu' else 'DEEPSEEK_API_KEY' }}</code>。</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <form class="im-compose" id="imForm" autocomplete="off">
+      <textarea id="imInput" rows="1" maxlength="4000" enterkeyhint="send"
+                placeholder="{{ ('和' ~ persona.name ~ '说点什么…') if ready else '模型没接通，先去配 provider' }}"
+                aria-label="输入消息"></textarea>
+      <button class="im-send" id="imSend" type="submit" disabled aria-label="发送">
+        <svg class="i-send" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V6"/><path d="M6.4 11.4L12 5.8l5.6 5.6"/></svg>
+        <svg class="i-stop" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="2.2"/></svg>
+      </button>
+    </form>
+    <p class="im-hint"><span>Enter 发送</span><span>Shift + Enter 换行</span></p>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='chat.js') }}{{ '?v=' ~ asset_v }}"></script>
+{% endblock %}

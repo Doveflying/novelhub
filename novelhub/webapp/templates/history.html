@@ -1,39 +1,54 @@
 {% extends "base.html" %}
-{% block title %}阅读历史{% endblock %}
+{% block title %}阅读历史 · 书萤{% endblock %}
+{% block crumb %}历史{% endblock %}
 {% block content %}
-<div class="shelf-head">
-  <h1>历史</h1>
-  <div class="shelf-actions">
-    <span class="meta small">
+<div class="page-head">
+  <div>
+    <div class="eyebrow">History</div>
+    <h1 class="page-title">阅读历史</h1>
+    <p class="page-sub">
       共 {{ total }} 条{% if total %}（小说 {{ counts.novel }} · 漫画 {{ counts.comic }} · 动漫 {{ counts.anime }}）{% endif %}
-    </span>
+      · 只记「读过什么」，不替代书架上的阅读进度
+    </p>
+  </div>
+  <div class="page-head-actions">
     {% if items %}
     <form method="post" action="{{ url_for('history_clear') }}"
           onsubmit="return confirm('清空{% if kind %}当前分类的{% endif %}全部历史？这本书的阅读进度不会丢。')">
       {% if kind %}<input type="hidden" name="kind" value="{{ kind }}">{% endif %}
-      <button class="btn ghost" type="submit">清空{% if kind %}本类{% endif %}</button>
+      <button class="btn btn-ghost" type="submit">
+        <svg class="ico"><use href="#i-trash"/></svg>清空{% if kind %}本类{% endif %}
+      </button>
     </form>
     {% endif %}
   </div>
 </div>
 
-<div class="tabs-row">
-  <a class="chip {{ 'on' if not kind }}" href="{{ url_for('history') }}">全部 {{ total }}</a>
-  <a class="chip {{ 'on' if kind == 'novel' }}" href="{{ url_for('history', kind='novel') }}">小说 {{ counts.novel }}</a>
-  <a class="chip {{ 'on' if kind == 'comic' }}" href="{{ url_for('history', kind='comic') }}">漫画 {{ counts.comic }}</a>
-  <a class="chip {{ 'on' if kind == 'anime' }}" href="{{ url_for('history', kind='anime') }}">动漫 {{ counts.anime }}</a>
+<div class="tabs" id="histTabs" role="tablist" aria-label="历史分类">
+  <button type="button" data-kind="all" class="{{ 'on' if not kind }}" role="tab" aria-selected="{{ 'true' if not kind else 'false' }}">全部 <span class="n">{{ total }}</span></button>
+  <button type="button" data-kind="novel" class="{{ 'on' if kind == 'novel' }}" role="tab" aria-selected="{{ 'true' if kind == 'novel' else 'false' }}">小说 <span class="n">{{ counts.novel }}</span></button>
+  <button type="button" data-kind="comic" class="{{ 'on' if kind == 'comic' }}" role="tab" aria-selected="{{ 'true' if kind == 'comic' else 'false' }}">漫画 <span class="n">{{ counts.comic }}</span></button>
+  <button type="button" data-kind="anime" class="{{ 'on' if kind == 'anime' }}" role="tab" aria-selected="{{ 'true' if kind == 'anime' else 'false' }}">动漫 <span class="n">{{ counts.anime }}</span></button>
 </div>
 
 {% if not items %}
-  <div class="empty">
-    <p class="big">还没有阅读记录</p>
-    <p>打开任意一本书 / 一话漫画 / 一集番，这里就会记下来。</p>
-    <p class="meta small">历史只记「读过什么」，不替代书架上的阅读进度。</p>
+<div class="empty">
+  <p class="big">还没有阅读记录</p>
+  <p>打开任意一本书 / 一话漫画 / 一集番，这里就会记下来。</p>
+  <div class="actions">
+    <a class="btn btn-accent" href="{{ url_for('index') }}">去书架看看</a>
   </div>
+</div>
 {% else %}
-  <div class="history-list">
-    {% for it in items %}
-    <article class="hist-row">
+  {% for g in groups %}
+  <section class="day-group" data-group="{{ g.label }}">
+    <div class="day-head">
+      <h3>{{ g.label }}</h3>
+      <span class="line"></span>
+      <span class="n">{{ g['items'] | length }} 条</span>
+    </div>
+    {% for it in g['items'] %}
+    <article class="hist" data-kind="{{ it.kind }}">
       <a class="hist-cover" href="{{ it.url or '#' }}">
         {% if it.cover %}
           {% if it.cover.startswith('/cover/') %}
@@ -42,34 +57,33 @@
             <img src="/api/img?u={{ it.cover | urlencode }}" alt="{{ it.title | zh }}" loading="lazy" data-fallback="1">
           {% endif %}
         {% else %}
-          <span class="cover-fallback">{{ (it.title | zh)[:2] }}</span>
+          <span class="cover-fallback"><b>{{ (it.title | zh)[:2] }}</b></span>
         {% endif %}
       </a>
       <div class="hist-body">
-        <h3>
+        <h3 class="hist-title">
           <a href="{{ it.url or '#' }}">{{ (it.title | zh) or '(未命名)' }}</a>
           <span class="chip kind-{{ it.kind }}">
             {% if it.kind == 'novel' %}小说{% elif it.kind == 'comic' %}漫画{% else %}动漫{% endif %}
           </span>
         </h3>
-        <p class="meta small">
+        <p class="hist-meta">
           {% if it.chapter_label %}读到 <b>{{ it.chapter_label | zh }}</b>{% else %}刚打开{% endif %}
           {% if it.sub %} · {{ it.sub | zh }}{% endif %}
           {% if it.source %} · <span class="chip">{{ it.source }}</span>{% endif %}
-        </p>
-        <p class="meta small hist-time">
-          {{ (it.last_read_at or '')[:16] | replace('T', ' ') }}
           {% if it.hits > 1 %} · 打开 {{ it.hits }} 次{% endif %}
         </p>
       </div>
+      <span class="hist-time">{{ (it.last_read_at or '')[:16] | replace('T', ' ') }}</span>
       <div class="hist-actions">
-        <a class="btn sm" href="{{ it.url or '#' }}">继续</a>
+        <a class="btn btn-sm" href="{{ it.url or '#' }}">继续</a>
         <form method="post" action="{{ url_for('history_delete', hid=it.id) }}">
-          <button class="btn sm ghost" type="submit" title="只从历史里移除">移除</button>
+          <button class="btn btn-sm btn-ghost" type="submit" title="只从历史里移除">移除</button>
         </form>
       </div>
     </article>
     {% endfor %}
-  </div>
+  </section>
+  {% endfor %}
 {% endif %}
 {% endblock %}

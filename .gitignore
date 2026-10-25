@@ -21,6 +21,8 @@ refs/venera/tags_tw.json
 refs/venera/init.js
 refs/venera/sample-copy_manga.js
 refs/venera/opencc.txt
+# auto-novel 是 GPL-3.0，只做本地参考，不 vendor 进来
+refs/auto-novel/
 
 # ============ 依赖 ============
 node_modules/
@@ -34,7 +36,30 @@ _packer_run.js
 _deob.js
 _fix_j.py
 _show_rank.py
+_cdp_measure.py
+_probe_tab.py
 *.log
+
+# ============ 打包产物（用 novelhub.spec 现场生成，不进仓库） ============
+/build/
+/dist/
+*.spec.bak
+build/icons/
+
+# ============ 设计稿截图（51MB，本地验收用；只提交原型与脚本） ============
+design/shots/
+design/*.png
+
+# ============ 运行时生成的图标（build/make_icons.py 可重建） ============
+# 例外：PWA/移动端要用的图标必须提交，否则装到主屏没图标
+!novelhub/webapp/static/brand/icon-*.png
+!novelhub/webapp/static/brand/apple-touch-icon.png
+
+# ============ 智能体工作目录 ============
+.workbuddy-ai/
+
+# ============ 构建用的临时环境 ============
+.build-venv/
 
 # ============ Python ============
 __pycache__/
